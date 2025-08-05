@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Borehole Dashboard - Malawi</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #map {
+      width: 100%;
+      height: 60vh;
+    }
+    #sidebar {
+      width: 100%;
+      padding: 10px;
+      background-color: #f8f9fa;
+      overflow-y: auto;
+      border-left: 1px solid #ddd;
+      height: 40vh;
+    }
+    canvas {
+      width: 100%;
+      height: 300px;
+    }
+    #searchBar {
+      margin-bottom: 10px;
+      padding: 5px;
+      width: 100%;
+    }
+    #submergence {
+      margin-top: 20px;
+      background-color: #ffeeba;
+      padding: 10px;
+      border: 1px solid #ffc107;
+    }
+    #exportBtn, #toggleHeatmap, #clearSearch, #downloadBtn {
+      margin-top: 10px;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 5px;
+      width: 100%;
+    }
+    #exportBtn { background-color: #28a745; }
+    #toggleHeatmap { background-color: #ffc107; color: black; }
+    #clearSearch { background-color: #6c757d; }
+    #districtSelector {
+      width: 100%;
+      margin-top: 10px;
+      padding: 5px;
+    }
+    @media (min-width: 768px) {
+      body { flex-direction: row; }
+      #map { width: 70%; height: 100vh; }
+      #sidebar { width: 30%; height: 100vh; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="sidebar">
+    <h2>Borehole Stats</h2>
+    <input type="text" id="searchBar" placeholder="Search by site name..." />
+    <button id="clearSearch">Clear Search</button>
+    <select id="districtSelector">
+      <option value="">-- Zoom to District --</option>
+      <option value="Dowa">Dowa</option>
+      <option value="Lilongwe">Lilongwe</option>
+      <option value="Dedza">Dedza</option>
+      <option value="Ntcheu">Ntcheu</option>
+      <option value="Chitipa">Chitipa</option>
+      <option value="Nkhotakota">Nkhotakota</option>
+    </select>
+    <p>Total Boreholes: <span id="total-count">Loading...</span></p>
+    <button id="exportBtn">Export to CSV</button>
+    <button id="toggleHeatmap">Toggle Heatmap</button>
+    <canvas id="districtChart"></canvas>
+    <div id="submergence">
+      <h3>Potential Land Submergence</h3>
+      <p>Areas with high borehole density may be at risk of subsidence. Consider monitoring <strong>Dowa</strong> and <strong>Lilongwe</strong>.</p>
+    </div>
+  </div>
+
+  <script>
+    const boreholeData = [
+      { site: "Matchado", lat: -13.777465, lon: 34.25583, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Ndalama", lat: -13.746785, lon: 34.2615, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mzalakoma Peg B", lat: -13.706707, lon: 34.256605, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mkwenembele", lat: -13.724208, lon: 34.246991, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Damba", lat: -13.673656, lon: 34.054441, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chimeza", lat: -13.70924, lon: 34.196643, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kamzati", lat: -13.746928, lon: 34.100455, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Gutsu", lat: -13.757715, lon: 34.113475, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chiwere", lat: -13.776423, lon: 34.129138, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kapazira", lat: -13.792633, lon: 34.126065, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kukhola", lat: -13.792089, lon: 34.161394, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kachikhada", lat: -13.696616, lon: 34.143762, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Msasata", lat: -13.659005, lon: 34.137875, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mwambula 1", lat: -13.74501, lon: 34.266977, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kautsagule", lat: -13.666743, lon: 34.045242, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mkomachi", lat: -13.76052, lon: 34.096627, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Yosiya", lat: -13.692395, lon: 34.08921, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Makalani", lat: -13.610816, lon: 34.08077, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kachidowo", lat: -13.602715, lon: 34.10109, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chimongo 3", lat: -13.614132, lon: 34.098172, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kambwiri", lat: -13.777243, lon: 34.275284, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Nyemba", lat: -13.713147, lon: 34.080853, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mnyalira", lat: -13.665542, lon: 34.122045, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mtakataka", lat: -13.6432, lon: 34.057067, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Mankwazi", lat: -13.594205, lon: 34.104974, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chapedya", lat: -13.638955, lon: 34.060568, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chinseu", lat: -13.635537, lon: 34.074735, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chitawa", lat: -13.632185, lon: 34.085183, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Sambo", lat: -13.6461504, lon: 34.089825, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Nyanda", lat: -13.6869573, lon: 34.081028, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Chimpala", lat: -13.678108, lon: 34.036118, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Kawangwi/Kasese", lat: -13.765063, lon: 34.243355, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
+      { site: "Malembo TC &CDSS BH A", lat: -13.616815, lon: 33.41633, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Malembo TC &CDSS BH B", lat: -13.62276, lon: 33.4156, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Madziamanga", lat: -13.880558, lon: 33.47105, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Nyanga BH A", lat: -13.839557, lon: 33.371203, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Nyanga BH B", lat: -13.840542, lon: 33.372452, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Magomero BH A", lat: -14.383181, lon: 33.867459, district: "Dedza", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Magomero BH B", lat: -14.371758, lon: 33.871044, district: "Dedza", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Kakhuta BH A", lat: -14.823125, lon: 34.624165, district: "Ntcheu", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+      { site: "Kakhuta BH B", lat: -14.823792, lon: 34.624333, district: "Ntcheu", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
+       { site: "Kankhomba", lat: -12.8484, lon: 34.1389, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Mkombezi", lat: -12.8368, lon: 34.1271, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Lundu", lat: -12.8496, lon: 34.1183, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Katutula", lat: -12.8586, lon: 34.1352, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Kapoka", lat: -12.8468, lon: 34.1459, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Kalopa", lat: -12.8595, lon: 34.1466, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Kampoyo", lat: -12.8445, lon: 34.1318, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
+{ site: "Misuku", lat: -9.7998, lon: 33.5684, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kameme", lat: -9.7513, lon: 33.6504, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwanjabala", lat: -9.7864, lon: 33.5714, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kalenge", lat: -9.7528, lon: 33.6203, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kapenda", lat: -9.8014, lon: 33.5963, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mabuka", lat: -9.7931, lon: 33.6021, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kapere", lat: -9.7482, lon: 33.6128, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Chisenga", lat: -9.7733, lon: 33.6025, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Chitipa Boma", lat: -9.7022, lon: 33.6077, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mbilima", lat: -9.6824, lon: 33.5982, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Ishalikira", lat: -9.7558, lon: 33.5839, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Lufita", lat: -9.7921, lon: 33.5792, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwanjawala", lat: -9.8074, lon: 33.5901, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kaseghe", lat: -9.7693, lon: 33.5699, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kalenge II", lat: -9.7442, lon: 33.6053, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kameme II", lat: -9.7412, lon: 33.6473, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Nthalire", lat: -10.0491, lon: 33.7197, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Ngana", lat: -9.8125, lon: 33.6632, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Buluma", lat: -9.8164, lon: 33.5775, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kalowa", lat: -9.7467, lon: 33.6033, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kameme B", lat: -9.7439, lon: 33.6515, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kapere II", lat: -9.7495, lon: 33.6113, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwakabanga", lat: -9.7891, lon: 33.5887, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwalweni", lat: -9.7659, lon: 33.6104, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Misuku North", lat: -9.7986, lon: 33.5618, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Ishalikira II", lat: -9.7532, lon: 33.5846, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kalanga", lat: -9.7884, lon: 33.5834, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Ntonda", lat: -9.8018, lon: 33.5899, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwanjawala II", lat: -9.8061, lon: 33.5915, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Buluma II", lat: -9.8145, lon: 33.5794, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kameme C", lat: -9.7428, lon: 33.6529, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Chitipa Rural", lat: -9.7523, lon: 33.6031, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Kalopa II", lat: -9.7583, lon: 33.6062, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mbalame", lat: -9.7814, lon: 33.5823, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Mwalweni II", lat: -9.7641, lon: 33.6117, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
+{ site: "Makuta 3", lat: -12.910352, lon: 34.28642, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Kaombe (Second attempt)", lat: -12.912433, lon: 34.295502, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Makuta 1 (Second attempt)", lat: -12.906315, lon: 34.291883, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chamndando (Second attempt)", lat: -12.917428, lon: 34.295653, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Phangwa (Second attempt)", lat: -12.920993, lon: 34.291291, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Makuta 2", lat: -12.906787, lon: 34.294896, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Vinthenga", lat: -12.893585, lon: 34.2972, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Njalachiuno", lat: -12.893599, lon: 34.170947, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Kapeta 1", lat: -12.889878, lon: 34.219859, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chinkhwangwa 1", lat: -12.713638, lon: 34.237072, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chisumba", lat: -12.814699, lon: 34.214001, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Jasi", lat: -12.837743, lon: 34.223918, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Kwambenga", lat: -12.861427, lon: 34.213035, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Kwabuwa", lat: -12.905432, lon: 34.213813, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chipaka", lat: -12.905207, lon: 34.213035, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Nkosi (Second Attempt)", lat: -12.861308, lon: 34.170947, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mtumbula 1", lat: -12.888632, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mtumbula 2", lat: -12.888632, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chanika", lat: -12.923529, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Phangwa", lat: -12.921506, lon: 34.291506, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Sasani", lat: -13.001526, lon: 34.283377, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chunga", lat: -12.910959, lon: 34.326764, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chiutula 2", lat: -13.009764, lon: 34.291966, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chiutula", lat: -12.980806, lon: 34.20403, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Maliteni", lat: -13.033513, lon: 34.22621, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mamba (Second Atteipt)", lat: -13.12439, lon: 34.204237, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Makani Gunde", lat: -13.141912, lon: 34.24442, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Matola Mboya", lat: -13.123993, lon: 34.285755, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Rajab lemsoni", lat: -13.156612, lon: 34.292386, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mlamba", lat: -13.141087, lon: 34.196148, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chikwawe", lat: -13.153958, lon: 34.273389, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mussa Chalunda", lat: -13.157086, lon: 34.301956, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mkunva", lat: -13.148657, lon: 34.32736, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mchengeleza 2", lat: -13.197482, lon: 34.277794, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Chongole", lat: -13.130388, lon: 34.32963, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Jamali", lat: -12.916854, lon: 34.32841, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Shaban", lat: -13.122537, lon: 34.277773, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
+{ site: "Mphozela", lat: -13.131946, lon: 34.283377, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" }
+
+    ];
+
+    const baseLayers = {
+      "OSM": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM contributors' }),
+      "Google Roadmap": L.tileLayer('http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Roadmap' }),
+      "Google Terrain": L.tileLayer('http://mt0.google.com/vt/lyrs=p&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Terrain' }),
+      "Google Satellite": L.tileLayer('http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Satellite' }),
+      "Google Hybrid": L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Hybrid' }),
+      "Altered Roadmap": L.tileLayer('http://mt0.google.com/vt/lyrs=r&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Altered Roadmap' }),
+      "Terrain Only": L.tileLayer('http://mt0.google.com/vt/lyrs=t&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Terrain Only' })
+    };
+
+    const map = L.map('map', {
+      center: [-13.9, 33.8],
+      zoom: 7,
+      layers: [baseLayers["OSM"]]
+    });
+
+    L.control.layers(baseLayers).addTo(map);
+
+    const markers = [];
+    const heatPoints = boreholeData.map(bh => [bh.lat, bh.lon, 0.5]);
+    const heat = L.heatLayer(heatPoints, {
+  radius: 25,         // Size of each heat point
+  blur: 15,           // How blurred the heat points appear
+  maxZoom: 12,        // Maximum zoom level where heatmap shows
+  gradient: {         // Color intensity scale
+    0.4: 'blue',      // Low density
+    0.6: 'lime',      // Medium density
+    0.9: 'red'        // High density
+  }
+}).addTo(map);        // Added to map by default
+
+
+
+
+
+
+    // Add heatmap layer
+var heatLayer = L.heatLayer(boreholeData, {
+  radius: 25,
+  blur: 15,
+  maxZoom: 17,
+}).addTo(map);
+
+
+// Toggle functionality
+document.getElementById('toggleHeatmap').addEventListener('click', () => {
+  map.hasLayer(heat) ? map.removeLayer(heat) : map.addLayer(heat);
+});
+    boreholeData.forEach(bh => {
+      const marker = L.marker([bh.lat, bh.lon])
+        .addTo(map)
+        .bindPopup(`<b>${bh.site}</b><br>District: ${bh.district}<br>Driller: ${bh.driller}<br>Owner: ${bh.owner}`);
+      markers.push({ marker, site: bh.site });
+    });
+
+    // Search functionality
+    const searchBar = document.getElementById('searchBar');
+    searchBar.addEventListener('input', () => {
+      const query = searchBar.value.toLowerCase();
+      markers.forEach(({ marker, site }) => {
+        marker.setOpacity(site.toLowerCase().includes(query) ? 1 : 0.2);
+      });
+    });
+
+    // Clear search
+    document.getElementById('clearSearch').addEventListener('click', () => {
+      searchBar.value = '';
+      markers.forEach(({ marker }) => marker.setOpacity(1));
+    });
+
+    // Zoom to district
+    document.getElementById('districtSelector').addEventListener('change', (e) => {
+      const district = e.target.value;
+      if (!district) return;
+      const districtBoreholes = boreholeData.filter(bh => bh.district === district);
+      if (districtBoreholes.length === 0) return;
+      const group = L.featureGroup(districtBoreholes.map(bh => L.marker([bh.lat, bh.lon])));
+      map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    });
+
+    // Toggle heatmap
+    let heatmapVisible = true;
+    document.getElementById('toggleHeatmap').addEventListener('click', () => {
+      heatmapVisible = !heatmapVisible;
+      heatmapVisible ? heat.addTo(map) : map.removeLayer(heat);
+    });
+
+    // CSV export with timestamp
+    function convertToCSV(data) {
+      const headers = Object.keys(data[0]).join(',');
+      const rows = data.map(obj => 
+        Object.values(obj).map(value => 
+          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+        ).join(',')
+      );
+      return [headers, ...rows].join('\n');
+    }
+
+    function downloadCSV() {
+      const csv = convertToCSV(boreholeData);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `borehole_data_${timestamp}.csv`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.setAttribute('href', URL.createObjectURL(blob));
+      link.setAttribute('download', filename);
+      link.click();
+    }
+
+    document.getElementById('exportBtn').addEventListener('click', downloadCSV);
+
+    // Chart
+    const districtCounts = boreholeData.reduce((acc, { district }) => {
+      acc[district] = (acc[district] || 0) + 1;
+      return acc;
+    }, {});
+
+    new Chart(document.getElementById('districtChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(districtCounts),
+        datasets: [{
+          label: 'Boreholes by District',
+          data: Object.values(districtCounts),
+          backgroundColor: '#28a745'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { 
+            display: true, 
+            text: 'Spatial Yield of Groundwater (via Borehole Count)'
+          }
+        }
+      }
+    });
+
+    document.getElementById('total-count').textContent = boreholeData.length;
+
+
+  </script>
+</body>
+</html>
