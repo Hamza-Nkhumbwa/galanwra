@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alumenda Security Intelligence Dashboard</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Papa Parse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Proj4 for UTM conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            height: 100vh;
+            background: #0a0c14;
+        }
+
+        /* Top Navigation */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(10, 20, 30, 0.98);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            color: white;
+            z-index: 1000;
+            border-bottom: 3px solid #dc2626;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo {
+            height: 45px;
+            width: auto;
+            background: white;
+            padding: 5px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.3);
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #fff, #fca5a5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .video-container {
+            width: 200px;
+            height: 45px;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid #dc2626;
+        }
+
+        .top-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Main Layout */
+        #container {
+            display: flex;
+            margin-top: 70px;
+            height: calc(100vh - 70px);
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 500px;
+            display: flex;
+            background: #111827;
+            border-right: 2px solid #1f2937;
+        }
+
+        .tabs-container {
+            width: 130px;
+            background: #0f172a;
+            display: flex;
+            flex-direction: column;
+            padding: 15px 0;
+        }
+
+        .tab {
+            padding: 12px 8px;
+            margin: 3px 10px;
+            cursor: pointer;
+            border-radius: 8px;
+            background: #1e293b;
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .tab i {
+            font-size: 14px;
+            width: 20px;
+        }
+
+        .tab:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            transform: translateX(3px);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            border-left-color: #fff;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+        }
+
+        .tab-content-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #111827;
+            color: #f1f5f9;
+            scrollbar-width: thin;
+            scrollbar-color: #dc2626 #1e293b;
+        }
+
+        .tab-content-container::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .tab-content-container::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .tab-content-container::-webkit-scrollbar-thumb {
+            background: #dc2626;
+            border-radius: 10px;
+        }
+
+        .tabContent {
+            display: none;
+        }
+
+        .tabContent.active-content {
+            display: block;
+            animation: fade 0.3s ease;
+        }
+
+        @keyframes fade {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Control Groups */
+        .control-group {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 18px;
+            border: 1px solid #334155;
+        }
+
+        .section-header {
+            font-size: 14px;
+            font-weight: 700;
+            color: #dc2626;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        label {
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-select, input[type="text"], input[type="password"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: white;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .form-select:focus, input:focus {
+            outline: none;
+            border-color: #dc2626;
+        }
+
+        .form-select option {
+            background: #1e293b;
+            color: white;
+            padding: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            border: none;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            transition: all 0.2s;
+            border: 1px solid #ef4444;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 38, 38, 0.4);
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-color: #fbbf24;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4b5563, #374151);
+            border-color: #6b7280;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 12px 0;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #0f172a;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #334155;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            accent-color: #dc2626;
+            width: 16px;
+            height: 16px;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 10px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #dc2626;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #dc2626;
+            border: 2px solid white;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .stat-card {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 10px;
+            border-left: 4px solid #dc2626;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #334155;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        canvas {
+            max-height: 200px;
+            width: 100% !important;
+        }
+
+        /* Month selector for pie chart */
+        .month-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .month-selector select {
+            width: 150px;
+            padding: 8px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: white;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        /* Map */
+        #map {
+            flex: 1;
+            background: #0a0c14;
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 18px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            max-width: 260px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .legend h4 {
+            margin-bottom: 12px;
+            color: #dc2626;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            width: 350px;
+            border: 2px solid #dc2626;
+        }
+
+        .modal-content h3 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        /* Buffer Info */
+        .buffer-info {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* Farm Selection Status */
+        .selection-status {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            color: #94a3b8;
+            font-size: 12px;
+            border-left: 3px solid #dc2626;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content">
+        <h3><i class="fas fa-lock" style="color: #dc2626;"></i> Secure Download</h3>
+        <input type="password" id="downloadPassword" placeholder="Enter password">
+        <div class="modal-buttons">
+            <button class="btn" onclick="verifyPassword()"><i class="fas fa-check"></i> Confirm</button>
+            <button class="btn btn-secondary" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Top Bar -->
+<div class="topbar">
+    <img class="logo" src="https://hamza-nkhumbwa.github.io/galanwra/wwjdlogo.png" alt="Alumenda Logo">
+    <div class="title">
+        <i class="fas fa-shield-alt" style="margin-right: 10px;"></i>
+        ALUMENDA SECURITY DASHBOARD
+    </div>
+    <div class="video-container">
+        <video class="top-video" autoplay muted loop>
+            <source src="https://hamza-nkhumbwa.github.io/datasets/earth.mp4" type="video/mp4">
+        </video>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div id="container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="tabs-container">
+            <div class="tab active" data-tab="fields"><i class="fas fa-map-marked-alt"></i> Fields</div>
+            <div class="tab" data-tab="activity"><i class="fas fa-exclamation-triangle"></i> Activity</div>
+            <div class="tab" data-tab="villages"><i class="fas fa-home"></i> Villages</div>
+            <div class="tab" data-tab="transition"><i class="fas fa-chart-line"></i> Transition</div>
+            <div class="tab" data-tab="lulc"><i class="fas fa-layer-group"></i> LULC</div>
+            <div class="tab" data-tab="dams"><i class="fas fa-water"></i> Dams</div>
+            <div class="tab" data-tab="buffer"><i class="fas fa-draw-polygon"></i> Buffer</div>
+            <div class="tab" data-tab="hotspot"><i class="fas fa-fire"></i> Hotspot</div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content-container">
+            <!-- Fields Tab -->
+            <div class="tabContent active-content" id="fieldscontent">
+                <div class="section-header">
+                    <i class="fas fa-map-marked-alt"></i> Fields Management
+                </div>
+                
+                <div class="control-group">
+                    <label><i class="fas fa-tractor"></i> Select Farm(s)</label>
+                    <select id="farmSelect" class="form-select" multiple size="4">
+                        <option value="61">🏭 Farm 61</option>
+                        <option value="62">🏭 Farm 62</option>
+                        <option value="71">🏭 Farm 71</option>
+                        <option value="72">🏭 Farm 72</option>
+                    </select>
+                    
+                    <div style="display: flex; gap: 10px; margin: 12px 0;">
+                        <button class="btn btn-sm btn-warning" onclick="selectAllFarms()">
+                            <i class="fas fa-check-double"></i> Select All
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="clearAllFarms()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+
+                    <div class="selection-status">
+                        <i class="fas fa-eye" style="color: #dc2626; margin-right: 5px;"></i>
+                        Selected farms appear instantly on the map
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Fields</div>
+                            <div class="stat-value" id="totalFields">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Visible</div>
+                            <div class="stat-value" id="visibleFields">0</div>
+                        </div>
+                    </div>
+
+                    <button class="btn" onclick="downloadSelectedFarms()" style="width: 100%;">
+                        <i class="fas fa-download"></i> Download Selected Farms
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-info-circle"></i> Instructions</label>
+                    <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
+                        • Select farms using the dropdown above<br>
+                        • Fields appear immediately on the map<br>
+                        • Click any field to view ID and Area<br>
+                        • Hover for highlight effect<br>
+                        • Use Ctrl/Cmd to select multiple farms
+                    </p>
+                </div>
+            </div>
+
+            <!-- Activity Tab - UPDATED WITH ALL CHANGES -->
+            <div class="tabContent" id="activitycontent">
+                <div class="section-header">
+                    <i class="fas fa-exclamation-triangle"></i> Activity Monitoring
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-filter"></i> Activity Type</label>
+                    <select id="activitySelect" class="form-select" multiple size="5">
+                        <option value="Intruders">🚨 Intruders</option>
+                        <option value="Sweepers">🧹 Sweepers</option>
+                        <option value="Finsh-Mongers">🎣 Finsh-Mongers</option>
+                        <option value="Fuel Mongers">⛽ Fuel Mongers</option>
+                        <option value="Others">📌 Others</option>
+                    </select>
+
+                    <div style="display: flex; gap: 10px; margin: 12px 0;">
+                        <button class="btn btn-sm btn-warning" onclick="selectAllActivities()">
+                            <i class="fas fa-check-double"></i> All
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="clearAllActivities()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Incidents</div>
+                            <div class="stat-value" id="totalIncidents">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Visible</div>
+                            <div class="stat-value" id="visibleIncidents">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UPDATED PIE CHART WITH MONTH SELECTOR -->
+                <div class="chart-container">
+                    <div class="chart-title">
+                        <i class="fas fa-chart-pie" style="color: #dc2626;"></i>
+                        Activity Distribution (by Frequency)
+                    </div>
+                    <div class="month-selector">
+                        <label for="monthSelect">Select Month:</label>
+                        <select id="monthSelect" class="form-select" style="width: 150px;">
+                            <option value="">Loading months...</option>
+                        </select>
+                    </div>
+                    <canvas id="activityPieChart"></canvas>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-chart-bar"></i> Chart Type</label>
+                    <select id="chartTypeSelect" class="form-select" onchange="updateActivityChart()">
+                        <option value="bar">📊 Bar Chart</option>
+                        <option value="line">📈 Line Chart</option>
+                        <option value="scatter">🔵 Scatter Plot</option>
+                    </select>
+                </div>
+
+                <!-- UPDATED BAR CHART WITH NEW DATA SOURCE -->
+                <div class="chart-container">
+                    <div class="chart-title">
+                        <i class="fas fa-chart-bar" style="color: #dc2626;"></i>
+                        Field vs Average Frequency
+                    </div>
+                    <canvas id="activityBarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Villages Tab -->
+            <div class="tabContent" id="villagescontent">
+                <div class="section-header">
+                    <i class="fas fa-home"></i> Villages
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-map-pin"></i> Select Village</label>
+                    <select id="villageSelect" class="form-select">
+                        <option value="">-- Choose Village --</option>
+                    </select>
+
+                    <button class="btn" onclick="zoomToVillage()" style="width: 100%; margin-top: 15px;">
+                        <i class="fas fa-search-location"></i> Zoom to Village
+                    </button>
+
+                    <div class="stats-grid" style="margin-top: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Villages</div>
+                            <div class="stat-value" id="totalVillages">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transition Tab -->
+            <div class="tabContent" id="transitioncontent">
+                <div class="section-header">
+                    <i class="fas fa-chart-line"></i> Transition Statistics
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Land Cover Change (2005-2025)
+                    </div>
+                    <canvas id="transitionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- LULC Tab -->
+            <div class="tabContent" id="lulccontent">
+                <div class="section-header">
+                    <i class="fas fa-layer-group"></i> LULC Maps
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-calendar"></i> Select Year</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="lulc2005"> <label>2005</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="lulc2015"> <label>2015</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="lulc2025"> <label>2025</label>
+                        </div>
+                    </div>
+
+                    <div class="slider-container">
+                        <label>Opacity: <span id="opacityValue">0.7</span></label>
+                        <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dams Tab -->
+            <div class="tabContent" id="damscontent">
+                <div class="section-header">
+                    <i class="fas fa-water"></i> Dams & Pumps
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-eye"></i> Layer Control</label>
+                    <button class="btn" onclick="toggleDams()" style="width: 100%;">
+                        <i class="fas fa-toggle-on"></i> Toggle Dams Layer
+                    </button>
+
+                    <div class="stats-grid" style="margin-top: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Dams</div>
+                            <div class="stat-value" id="totalDams">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buffer Tab -->
+            <div class="tabContent" id="buffercontent">
+                <div class="section-header">
+                    <i class="fas fa-draw-polygon"></i> Buffer Analysis
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-ruler"></i> Buffer Radius</label>
+                    <select id="bufferSelect" class="form-select">
+                        <option value="">Select Distance</option>
+                        <option value="500">0 - 500 meters</option>
+                        <option value="1000">500 - 1000 meters</option>
+                        <option value="2000">1000+ meters</option>
+                    </select>
+
+                    <button class="btn" onclick="applyBuffer()" style="width: 100%; margin-top: 15px;">
+                        <i class="fas fa-play"></i> Apply Buffer
+                    </button>
+
+                    <button class="btn btn-secondary" onclick="clearBuffer()" style="width: 100%; margin-top: 10px;">
+                        <i class="fas fa-trash"></i> Clear Buffer
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-info-circle"></i> How to use</label>
+                    <p style="color: #94a3b8; font-size: 13px; line-height: 1.8;">
+                        1. Click on map to set center<br>
+                        2. Select buffer radius<br>
+                        3. Click Apply Buffer<br>
+                        4. Activities inside are counted
+                    </p>
+                </div>
+            </div>
+
+            <!-- Hotspot Tab -->
+            <div class="tabContent" id="hotspotcontent">
+                <div class="section-header">
+                    <i class="fas fa-fire"></i> Hotspot Fields
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Fields vs Incident Frequency
+                    </div>
+                    <canvas id="hotspotChart"></canvas>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-upload"></i> Upload CSV</label>
+                    <input type="file" id="hotspotCSV" accept=".csv" class="form-select">
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 8px;">
+                        Format: Field, Frequency
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+</div>
+
+<!-- LULC Legend -->
+<div class="legend" id="lulcLegend">
+    <h4><i class="fas fa-palette"></i> LULC Classes</h4>
+    <div class="legend-item"><span class="legend-color" style="background:#3264d6;"></span> Water</div>
+    <div class="legend-item"><span class="legend-color" style="background:#98ff00;"></span> Sugarcane</div>
+    <div class="legend-item"><span class="legend-color" style="background:#fd7912;"></span> Built-up</div>
+    <div class="legend-item"><span class="legend-color" style="background:#212020;"></span> Bare Land</div>
+    <div class="legend-item"><span class="legend-color" style="background:#8c8e8c;"></span> Roads</div>
+    <div class="legend-item"><span class="legend-color" style="background:#3af7ee;"></span> Wetland</div>
+    <div class="legend-item"><span class="legend-color" style="background:#7e5937;"></span> Forest</div>
+    <div class="legend-item"><span class="legend-color" style="background:#006600;"></span> trees</div>
+    <div class="legend-item"><span class="legend-color" style="background:#eded51;"></span> Agrilculrute!</div>
+</div>
+
+<!-- Buffer Info -->
+<div id="bufferInfo" class="buffer-info" style="display: none;">
+    <i class="fas fa-map-marker-alt" style="color: #dc2626;"></i>
+    <span id="bufferDistance"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // ========== UTM Zone 36S Definition ==========
+    proj4.defs("EPSG:32736", "+proj=utm +zone=36 +south +datum=WGS84 +units=m +no_defs");
+
+    // ========== Map Initialization ==========
+    var map = L.map('map', {
+        center: [-16.386587, 34.893946],
+        zoom: 12,
+        zoomControl: true,
+        maxZoom: 20
+    });
+
+    // Create panes for layer ordering
+    map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
+    map.createPane('lulcPane'); map.getPane('lulcPane').style.zIndex = 300;
+    map.createPane('fieldsPane'); map.getPane('fieldsPane').style.zIndex = 400;
+    map.createPane('activityPane'); map.getPane('activityPane').style.zIndex = 500;
+    map.createPane('villagesPane'); map.getPane('villagesPane').style.zIndex = 450;
+    map.createPane('damsPane'); map.getPane('damsPane').style.zIndex = 460;
+    map.createPane('bufferPane'); map.getPane('bufferPane').style.zIndex = 350;
+
+    // ========== Basemaps (Google Hybrid as default) ==========
+    var basemaps = {
+        googleHybrid: L.tileLayer('http://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            pane: 'basemapPane',
+            maxZoom: 20
+        }),
+        googleSat: L.tileLayer('http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        googleRoad: L.tileLayer('http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        googleTerrain: L.tileLayer('http://mt0.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { pane: 'basemapPane' }),
+        cartoDark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { pane: 'basemapPane' })
+    };
+
+    // Add default basemap (Google Hybrid)
+    basemaps.googleHybrid.addTo(map);
+
+    // Basemap control
+    L.control.layers(basemaps).addTo(map);
+
+    // Scale bar
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+
+    // ========== Layer Groups ==========
+    var farmLayers = {};
+    var activityLayer = L.layerGroup().addTo(map);
+    var villagesLayer = L.layerGroup().addTo(map);
+    var damsLayer = L.layerGroup().addTo(map);
+    var bufferLayer = L.layerGroup();
+
+    // ========== LULC Layers ==========
+    var lulc2005 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/bc79a77a7f5ad3ea9eddf2e583589073-55696e7c8e84926b4cce85e1c40ee914/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
+    var lulc2015 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/dc191c4dd5c74646c729f082068f87c0-876642a806eb407fda08c8013331ff3e/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
+    var lulc2025 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/4f4b200fa2f5da6cdab0277a5a823391-b21de90e68ed87e22b14d97cfc42464e/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
+
+    // LULC toggles
+    document.getElementById("lulc2005").addEventListener('change', function(e) {
+        e.target.checked ? lulc2005.addTo(map) : map.removeLayer(lulc2005);
+    });
+    document.getElementById("lulc2015").addEventListener('change', function(e) {
+        e.target.checked ? lulc2015.addTo(map) : map.removeLayer(lulc2015);
+    });
+    document.getElementById("lulc2025").addEventListener('change', function(e) {
+        e.target.checked ? lulc2025.addTo(map) : map.removeLayer(lulc2025);
+    });
+
+    // Opacity control
+    document.getElementById("opacitySlider").addEventListener('input', function(e) {
+        var opacity = e.target.value;
+        document.getElementById("opacityValue").textContent = opacity;
+        [lulc2005, lulc2015, lulc2025].forEach(l => l.setOpacity(opacity));
+    });
+
+    // ========== Tab System ==========
+    document.querySelectorAll(".tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tabContent").forEach(c => c.classList.remove("active-content"));
+            
+            tab.classList.add("active");
+            document.getElementById(tab.dataset.tab + "content").classList.add("active-content");
+        });
+    });
+
+    // ========== UTM Conversion Helper ==========
+    function utmToLatLng(easting, northing) {
+        try {
+            var result = proj4("EPSG:32736", "EPSG:4326", [parseFloat(easting), parseFloat(northing)]);
+            return { lat: result[1], lng: result[0] };
+        } catch(e) {
+            console.error('UTM conversion error:', e);
+            return null;
+        }
+    }
+
+    // ========== FIELDS LAYER - Instant display on selection ==========
+    var fieldCounts = { '61': 0, '62': 0, '71': 0, '72': 0 };
+    var totalFields = 0;
+
+    function loadFarm(farmId) {
+        fetch(`https://hamza-nkhumbwa.github.io/galanwra/Farm${farmId}.geojson`)
+            .then(r => r.json())
+            .then(data => {
+                var layer = L.geoJSON(data, {
+                    style: { 
+                        fillColor: getFarmColor(farmId),
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.6
+                    },
+                    onEachFeature: (feature, layer) => {
+                        fieldCounts[farmId]++;
+                        totalFields++;
+                        document.getElementById('totalFields').textContent = totalFields;
+                        
+                        if (feature.properties) {
+                            layer.bindPopup(`
+                                <div style="padding: 10px;">
+                                    <h4 style="color: #dc2626; margin-bottom: 8px;">Field Details</h4>
+                                    <p><b>ID:</b> ${feature.properties.ID || 'N/A'}</p>
+                                    <p><b>Area (ha):</b> ${feature.properties['Area(ha)'] || feature.properties.AREA || 'N/A'}</p>
+                                    <p><b>Farm:</b> ${farmId}</p>
+                                </div>
+                            `);
+                            
+                            layer.on('mouseover', function() {
+                                this.setStyle({ weight: 4, fillOpacity: 0.8 });
+                            });
+                            layer.on('mouseout', function() {
+                                this.setStyle({ weight: 2, fillOpacity: 0.6 });
+                            });
+                        }
+                    }
+                }, { pane: 'fieldsPane' });
+                
+                farmLayers[farmId] = layer;
+                
+                // Auto-display if farm is selected in dropdown
+                var select = document.getElementById('farmSelect');
+                var selectedValues = Array.from(select.selectedOptions).map(opt => opt.value);
+                if (selectedValues.includes(farmId)) {
+                    layer.addTo(map);
+                }
+                
+                updateVisibleFields();
+            });
+    }
+
+    function getFarmColor(farmId) {
+        return { '61': '#ef4444', '62': '#3b82f6', '71': '#10b981', '72': '#f59e0b' }[farmId] || '#94a3b8';
+    }
+
+    // Load all farms
+    ['61', '62', '71', '72'].forEach(loadFarm);
+
+    // Farm selection - INSTANT DISPLAY ON MAP
+    document.getElementById('farmSelect').addEventListener('change', function(e) {
+        var selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+        
+        // First, remove all farm layers from map
+        Object.keys(farmLayers).forEach(key => {
+            if (map.hasLayer(farmLayers[key])) {
+                map.removeLayer(farmLayers[key]);
+            }
+        });
+        
+        // Then add only selected farms - THEY APPEAR INSTANTLY ON MAP
+        selected.forEach(farmId => {
+            if (farmLayers[farmId]) {
+                farmLayers[farmId].addTo(map);
+            }
+        });
+        
+        updateVisibleFields();
+        
+        // Optional: Zoom to show all selected farms
+        if (selected.length > 0) {
+            var bounds = L.latLngBounds([]);
+            selected.forEach(farmId => {
+                if (farmLayers[farmId]) {
+                    farmLayers[farmId].eachLayer(layer => {
+                        bounds.extend(layer.getBounds());
+                    });
+                }
+            });
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    });
+
+    function updateVisibleFields() {
+        var visible = 0;
+        Object.keys(farmLayers).forEach(key => {
+            if (map.hasLayer(farmLayers[key])) {
+                farmLayers[key].eachLayer(() => visible++);
+            }
+        });
+        document.getElementById('visibleFields').textContent = visible;
+    }
+
+    function selectAllFarms() {
+        var select = document.getElementById('farmSelect');
+        Array.from(select.options).forEach(o => o.selected = true);
+        select.dispatchEvent(new Event('change'));
+    }
+
+    function clearAllFarms() {
+        var select = document.getElementById('farmSelect');
+        Array.from(select.options).forEach(o => o.selected = false);
+        select.dispatchEvent(new Event('change'));
+    }
+
+    // ========== Password Download ==========
+    var modal = document.getElementById('passwordModal');
+    var currentDownload = null;
+
+    function downloadSelectedFarms() {
+        var selected = Array.from(document.getElementById('farmSelect').selectedOptions).map(opt => opt.value);
+        if (selected.length === 0) { alert('Select farms first'); return; }
+        currentDownload = selected;
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        modal.classList.remove('active');
+        document.getElementById('downloadPassword').value = '';
+    }
+
+    function verifyPassword() {
+        if (document.getElementById('downloadPassword').value === 'WWJD2026') {
+            downloadFarms(currentDownload);
+            closeModal();
+        } else { alert('❌ Incorrect password'); }
+    }
+
+    function downloadFarms(farmIds) {
+        farmIds.forEach(id => {
+            fetch(`https://hamza-nkhumbwa.github.io/galanwra/Farm${id}.geojson`)
+                .then(r => r.json())
+                .then(data => {
+                    var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `Farm${id}.geojson`;
+                    a.click();
+                });
+        });
+    }
+
+    // ========== UPDATED: Activity Data from Activity.csv ==========
+    var activityData = [];
+    var activityMarkers = [];
+
+    function loadActivityData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Activity.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                activityData = results.data;
+                displayActivities(activityData);
+                document.getElementById('totalIncidents').textContent = activityData.length;
+            },
+            error: function(error) {
+                console.error('Error loading Activity.csv:', error);
+                alert('Error loading activity data. Please check the console.');
+            }
+        });
+    }
+
+    function displayActivities(data) {
+        activityLayer.clearLayers();
+        activityMarkers = [];
+        
+        data.forEach(row => {
+            if (row.Eastings && row.Northings) {
+                var latlng = utmToLatLng(row.Eastings, row.Northings);
+                if (latlng) {
+                    var marker = L.circleMarker([latlng.lat, latlng.lng], {
+                        radius: 7,
+                        fillColor: getActivityColor(row.Activity),
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.9,
+                        pane: 'activityPane'
+                    });
+                    
+                    // UPDATED: Detailed popup with all columns displayed vertically
+                    marker.bindPopup(`
+                        <div style="padding: 12px; max-width: 300px;">
+                            <h4 style="color: #dc2626; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px;">Activity Details</h4>
+                            <div style="line-height: 1.8;">
+                                <p><b>Farm:</b> ${row.Farm || 'N/A'}</p>
+                                <p><b>Field:</b> ${row.Field || 'N/A'}</p>
+                                <p><b>Eastings:</b> ${row.Eastings || 'N/A'}</p>
+                                <p><b>Northings:</b> ${row.Northings || 'N/A'}</p>
+                                <p><b>Crop/Feature:</b> ${row['Crop/Feature'] || 'N/A'}</p>
+                                <p><b>Crop Age:</b> ${row['Crop Age'] || 'N/A'}</p>
+                                <p><b>Activity:</b> ${row.Activity || 'N/A'}</p>
+                                <p><b>Date:</b> ${row.Date || 'N/A'}</p>
+                                <p><b>Time:</b> ${row.Time || 'N/A'}</p>
+                                <p><b>Day/Night:</b> ${row['Day/Night'] || 'N/A'}</p>
+                                <p><b>Frequency:</b> ${row.Frequency || 'N/A'}</p>
+                                <p><b>Rate:</b> ${row.Rate || 'N/A'}</p>
+                            </div>
+                        </div>
+                    `);
+                    
+                    marker.on('mouseover', function() { this.setStyle({ radius: 9 }); });
+                    marker.on('mouseout', function() { this.setStyle({ radius: 7 }); });
+                    
+                    marker.addTo(activityLayer);
+                    activityMarkers.push(marker);
+                }
+            }
+        });
+        
+        updateVisibleCount();
+    }
+
+    function getActivityColor(activity) {
+        return { 
+            'Intruders': '#ef4444',
+            'Sweepers': '#f59e0b',
+            'Finsh-Mongers': '#10b981',
+            'Fuel Mongers': '#3b82f6',
+            'Others': '#8b5cf6'
+        }[activity] || '#94a3b8';
+    }
+
+    function selectAllActivities() {
+        var select = document.getElementById('activitySelect');
+        Array.from(select.options).forEach(o => o.selected = true);
+        filterActivities();
+    }
+
+    function clearAllActivities() {
+        var select = document.getElementById('activitySelect');
+        Array.from(select.options).forEach(o => o.selected = false);
+        filterActivities();
+    }
+
+    function filterActivities() {
+        var selected = Array.from(document.getElementById('activitySelect').selectedOptions).map(o => o.value);
+        
+        activityLayer.eachLayer(layer => {
+            var content = layer.getPopup().getContent();
+            var match = selected.length === 0 || selected.some(s => content.includes(s));
+            
+            if (match) {
+                if (!map.hasLayer(layer)) layer.addTo(activityLayer);
+            } else {
+                if (map.hasLayer(layer)) layer.remove();
+            }
+        });
+        
+        updateVisibleCount();
+    }
+
+    function updateVisibleCount() {
+        var count = 0;
+        activityLayer.eachLayer(() => count++);
+        document.getElementById('visibleIncidents').textContent = count;
+    }
+
+    document.getElementById('activitySelect').addEventListener('change', filterActivities);
+
+    // ========== NEW: Monthly Pie Chart from PieChat.csv ==========
+    var activityPieChart;
+    var pieChartData = {};
+
+    function loadPieChartData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/PieChat.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                // Process data - group by month
+                var months = [...new Set(results.data.map(row => row.Month))].filter(Boolean);
+                
+                // Populate month selector
+                var monthSelect = document.getElementById('monthSelect');
+                monthSelect.innerHTML = '<option value="">Select Month</option>';
+                months.forEach(month => {
+                    var option = document.createElement('option');
+                    option.value = month;
+                    option.textContent = month;
+                    monthSelect.appendChild(option);
+                });
+                
+                // Store data by month
+                pieChartData = {};
+                results.data.forEach(row => {
+                    if (row.Month && row.Activity && row.AverageFrequency) {
+                        if (!pieChartData[row.Month]) {
+                            pieChartData[row.Month] = {};
+                        }
+                        pieChartData[row.Month][row.Activity] = parseFloat(row.AverageFrequency) || 0;
+                    }
+                });
+                
+                // Add event listener for month change
+                monthSelect.addEventListener('change', function(e) {
+                    updatePieChart(e.target.value);
+                });
+                
+                // Show first month by default if available
+                if (months.length > 0) {
+                    monthSelect.value = months[0];
+                    updatePieChart(months[0]);
+                }
+            },
+            error: function(error) {
+                console.error('Error loading PieChat.csv:', error);
+                document.getElementById('monthSelect').innerHTML = '<option value="">Error loading months</option>';
+            }
+        });
+    }
+
+    function updatePieChart(month) {
+        if (!month || !pieChartData[month]) {
+            return;
+        }
+        
+        var data = pieChartData[month];
+        var activities = Object.keys(data);
+        var frequencies = Object.values(data);
+        
+        var ctx = document.getElementById('activityPieChart').getContext('2d');
+        if (activityPieChart) activityPieChart.destroy();
+        
+        activityPieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: activities,
+                datasets: [{
+                    data: frequencies,
+                    backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { 
+                        labels: { 
+                            color: '#fff', 
+                            font: { size: 11 } 
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `Activity Distribution - ${month}`,
+                        color: '#fff',
+                        font: { size: 14 }
+                    }
+                }
+            }
+        });
+    }
+
+    // ========== NEW: Bar Chart from Bargraph.csv ==========
+    var activityBarChart;
+
+    function loadBarChartData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Bargraph.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                var fields = [];
+                var frequencies = [];
+                
+                results.data.forEach(row => {
+                    if (row.Field && row.AverageFrequency) {
+                        fields.push(row.Field);
+                        frequencies.push(parseFloat(row.AverageFrequency) || 0);
+                    }
+                });
+                
+                var ctx = document.getElementById('activityBarChart').getContext('2d');
+                if (activityBarChart) activityBarChart.destroy();
+                
+                activityBarChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: fields,
+                        datasets: [{
+                            label: 'Average Frequency',
+                            data: frequencies,
+                            backgroundColor: '#ef4444',
+                            borderColor: '#fff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                labels: { color: '#fff' } 
+                            } 
+                        },
+                        scales: {
+                            y: { 
+                                ticks: { color: '#fff' }, 
+                                grid: { color: '#334155' },
+                                beginAtZero: true
+                            },
+                            x: { 
+                                ticks: { color: '#fff', maxRotation: 45, minRotation: 45 },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            },
+            error: function(error) {
+                console.error('Error loading Bargraph.csv:', error);
+            }
+        });
+    }
+
+    function updateActivityChart() {
+        var type = document.getElementById('chartTypeSelect').value;
+        if (activityBarChart) {
+            activityBarChart.config.type = type;
+            activityBarChart.update();
+        }
+    }
+
+    // ========== Villages ==========
+    function loadVillages() {
+        fetch('https://hamza-nkhumbwa.github.io/galanwra/Alumendavillages.geojson')
+            .then(r => r.json())
+            .then(data => {
+                var select = document.getElementById('villageSelect');
+                var count = 0;
+                
+                L.geoJSON(data, {
+                    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+                        radius: 7,
+                        fillColor: '#f59e0b',
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.8,
+                        pane: 'villagesPane'
+                    }),
+                    onEachFeature: (f, layer) => {
+                        count++;
+                        var props = f.properties || {};
+                        layer.bindPopup(`
+                            <div style="padding: 8px;">
+                                <h4 style="color: #f59e0b;">Village Details</h4>
+                                <p><b>NAME:</b> ${props.NAME || 'N/A'}</p>
+                                <p><b>TA:</b> ${props.TANAME || 'N/A'}</p>
+                                <p><b>DISTRICT:</b> ${props.DISTRICT || 'N/A'}</p>
+                                <p><b>UTM EAST:</b> ${props.UTMEAST || 'N/A'}</p>
+                                <p><b>UTM NORTH:</b> ${props.UTMNORTH || 'N/A'}</p>
+                            </div>
+                        `);
+                        
+                        if (props.NAME) {
+                            var opt = document.createElement('option');
+                            opt.value = props.NAME;
+                            opt.textContent = props.NAME;
+                            select.appendChild(opt);
+                        }
+                    }
+                }).addTo(villagesLayer);
+                
+                document.getElementById('totalVillages').textContent = count;
+            });
+    }
+
+    function zoomToVillage() {
+        var name = document.getElementById('villageSelect').value;
+        if (!name) { alert('Select a village'); return; }
+        
+        villagesLayer.eachLayer(layer => {
+            if (layer.getPopup().getContent().includes(name)) {
+                map.setView(layer.getLatLng(), 15);
+                layer.openPopup();
+            }
+        });
+    }
+
+    // ========== Transition Statistics ==========
+    function loadTransitionData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/ALUMENDA%20EXCEL.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                var years = ['2005', '2015', '2025'];
+                var classes = [...new Set(results.data.map(r => r.Class))];
+                
+                var datasets = classes.map((c, i) => ({
+                    label: c,
+                    data: years.map(y => {
+                        var row = results.data.find(r => r.Class === c);
+                        return row ? parseFloat(row[y]) || 0 : 0;
+                    }),
+                    backgroundColor: `hsl(${i * 45}, 70%, 60%)`
+                }));
+                
+                var ctx = document.getElementById('transitionChart').getContext('2d');
+                if (window.transitionChart) window.transitionChart.destroy();
+                window.transitionChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: years, datasets },
+                    options: {
+                        plugins: { legend: { labels: { color: '#fff' } } },
+                        scales: {
+                            y: { ticks: { color: '#fff' }, grid: { color: '#334155' } },
+                            x: { ticks: { color: '#fff' } }
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // ========== Dams ==========
+    function loadDams() {
+        fetch('https://hamza-nkhumbwa.github.io/galanwra/damz.geojson')
+            .then(r => r.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    pointToLayer: (f, latlng) => L.marker(latlng, {
+                        icon: L.divIcon({
+                            html: '<i class="fas fa-water" style="color: #3b82f6; font-size: 22px;"></i>',
+                            iconSize: [30, 30]
+                        })
+                    }),
+                    onEachFeature: (f, layer) => {
+                        layer.bindPopup(`<b>Dam ID:</b> ${f.properties?.ID || 'N/A'}`);
+                    }
+                }).addTo(damsLayer);
+                
+                document.getElementById('totalDams').textContent = data.features.length;
+            });
+    }
+
+    function toggleDams() {
+        map.hasLayer(damsLayer) ? map.removeLayer(damsLayer) : map.addLayer(damsLayer);
+    }
+
+    // ========== Buffer Analysis ==========
+    var selectedPoint = null;
+
+    map.on('click', function(e) {
+        selectedPoint = e.latlng;
+        document.getElementById('bufferInfo').style.display = 'block';
+        document.getElementById('bufferDistance').innerHTML = 
+            `<b>Point:</b> ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+    });
+
+    function applyBuffer() {
+        var radius = document.getElementById('bufferSelect').value;
+        if (!radius) { alert('Select radius'); return; }
+        if (!selectedPoint) { alert('Click map first'); return; }
+        
+        bufferLayer.clearLayers();
+        
+        L.circle(selectedPoint, {
+            radius: parseInt(radius),
+            color: '#dc2626',
+            fillColor: '#dc2626',
+            fillOpacity: 0.1,
+            weight: 3,
+            dashArray: '5,5',
+            pane: 'bufferPane'
+        }).addTo(bufferLayer);
+        
+        map.addLayer(bufferLayer);
+        
+        // Count activities
+        var count = 0;
+        activityMarkers.forEach(m => {
+            if (map.distance(selectedPoint, m.getLatLng()) <= radius) count++;
+        });
+        
+        alert(`✅ ${count} activities within ${radius}m`);
+    }
+
+    function clearBuffer() {
+        bufferLayer.clearLayers();
+        document.getElementById('bufferInfo').style.display = 'none';
+        selectedPoint = null;
+    }
+
+    // ========== Hotspot Chart ==========
+    var hotspotChart;
+
+    function createHotspotChart() {
+        var ctx = document.getElementById('hotspotChart').getContext('2d');
+        hotspotChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Field A', 'Field B', 'Field C', 'Field D', 'Field E'],
+                datasets: [{
+                    label: 'Frequency',
+                    data: [12, 19, 8, 15, 10],
+                    backgroundColor: '#dc2626'
+                }]
+            },
+            options: {
+                plugins: { legend: { labels: { color: '#fff' } } },
+                scales: {
+                    y: { ticks: { color: '#fff' }, grid: { color: '#334155' } },
+                    x: { ticks: { color: '#fff' } }
+                }
+            }
+        });
+    }
+
+    document.getElementById('hotspotCSV').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (file) {
+            Papa.parse(file, {
+                header: true,
+                complete: function(r) {
+                    var fields = r.data.map(d => d.Field).filter(Boolean);
+                    var freqs = r.data.map(d => parseFloat(d.Frequency) || 0);
+                    
+                    if (hotspotChart) hotspotChart.destroy();
+                    hotspotChart = new Chart(document.getElementById('hotspotChart').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: fields,
+                            datasets: [{
+                                label: 'Frequency',
+                                data: freqs,
+                                backgroundColor: '#dc2626'
+                            }]
+                        },
+                        options: {
+                            plugins: { legend: { labels: { color: '#fff' } } },
+                            scales: {
+                                y: { ticks: { color: '#fff' }, grid: { color: '#334155' } },
+                                x: { ticks: { color: '#fff' } }
+                            }
+                        }
+                    });
+                }
+            });
+        }
+    });
+
+    // ========== Initialize Everything ==========
+    loadActivityData();
+    loadPieChartData();
+    loadBarChartData();
+    loadVillages();
+    loadTransitionData();
+    loadDams();
+    createHotspotChart();
+</script>
+
+</body>
+</html>
