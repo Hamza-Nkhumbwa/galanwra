@@ -1,5 +1,5 @@
 Farm,Field ,Eastings,Northings,Crop-Feature,Age-Crop,Activity,Date,Time,Day/Night,Frequency,Rate
-Farm61,6112,705497.049,8186009.942,Sugarcane,4,Stealing,7/2/2026,1630,Day,2,Medium 
+Farm61,6112,705497.049,8186009.942,Sugarcane,4,Intruders,7/2/2026,1630,Day,2,Medium 
 Farm61,6109,705804.897,8186656.278,Sugarcane,6,Stealing,26/01/2026,1540,Day,8,High
 Farm61,,,,,,,,,,,Low 
 Farm61,,,,,,,,,,,
@@ -187,3 +187,4 @@ Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
+
