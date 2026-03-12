@@ -3,8 +3,8 @@ Farm61,6112,705497.049,8186009.942,Sugarcane,4,Intruders,7/2/2026,1630,Day,2,Low
 Farm61,6109,705804.897,8186656.278,Sugarcane,6,Intruders,26/01/2026,1540,Day,8,Low 
 Farm62,6400,701889.104,8185595.502,Sugarcane,9,Intruders,3/3/2026,1600,Day,10,Low 
 Farm62,6506,701480.0626,8188073.757,Fuel,N/A,Fuel Mongers,5/3/2026,1200,Day,1,Low 
-Farm61,,,,,,,,,,,
-Farm61,,,,,,,,,,,
+Farm72,7407,698771.9037,8189744.51,Fertilizer,N/A,Sweepers,5/03/2026,1200,Day,1,Low
+Farm62,6611,699298.1745,8185504.06,Electricity,N/A,Others,04/02/2026,0600,Day,2,High
 Farm61,,,,,,,,,,,
 Farm61,,,,,,,,,,,
 Farm61,,,,,,,,,,,
@@ -187,3 +187,4 @@ Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
 Farm72,,,,,,,,,,,
+
