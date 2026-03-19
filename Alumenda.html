@@ -15,6 +15,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- Proj4 for UTM conversion -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <!-- Leaflet.heat for heatmap -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     
     <style>
         * {
@@ -50,7 +52,7 @@
         }
 
         .logo {
-            height: 45px;
+            height: 65px;
             width: auto;
             background: white;
             padding: 5px 15px;
@@ -68,16 +70,16 @@
         }
 
         .video-container {
-            width: 200px;
-            height: 45px;
+            width: 85px;
+            height: 55px;
             overflow: hidden;
             border-radius: 8px;
             border: 1px solid #dc2626;
         }
 
         .top-video {
-            width: 100%;
-            height: 100%;
+            width: 96%;
+            height: 120%;
             object-fit: cover;
         }
 
@@ -426,6 +428,29 @@
             border: 1px solid rgba(255,255,255,0.2);
         }
 
+        /* Heatmap Legend */
+        .heatmap-legend {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            font-size: 12px;
+        }
+
+        .heatmap-gradient {
+            width: 200px;
+            height: 20px;
+            background: linear-gradient(to right, blue, cyan, lime, yellow, red);
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -490,6 +515,24 @@
             color: #94a3b8;
             font-size: 12px;
             border-left: 3px solid #dc2626;
+        }
+
+        /* Layer toggle status indicators */
+        .layer-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        
+        .status-active {
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        
+        .status-inactive {
+            background-color: #6b7280;
         }
     </style>
 </head>
@@ -595,7 +638,7 @@
                 </div>
             </div>
 
-            <!-- Activity Tab - UPDATED WITH ALL CHANGES -->
+            <!-- Activity Tab - FIXED WITH HEATMAP -->
             <div class="tabContent" id="activitycontent">
                 <div class="section-header">
                     <i class="fas fa-exclamation-triangle"></i> Activity Monitoring
@@ -605,9 +648,9 @@
                     <label><i class="fas fa-filter"></i> Activity Type</label>
                     <select id="activitySelect" class="form-select" multiple size="5">
                         <option value="Intruders">🚨 Intruders</option>
-                        <option value="Sweepers">🧹 Sweepers</option>
-                        <option value="Finsh-Mongers">🎣 Finsh-Mongers</option>
+                        <option value="Fish-Mongers">🎣 Fish-Mongers</option>
                         <option value="Fuel Mongers">⛽ Fuel Mongers</option>
+                        <option value="Sweepers">🧹 Sweepers</option>
                         <option value="Others">📌 Others</option>
                     </select>
 
@@ -630,6 +673,29 @@
                             <div class="stat-value" id="visibleIncidents">0</div>
                         </div>
                     </div>
+                </div>
+
+                <!-- NEW: Heatmap Toggle with Status -->
+                <div class="control-group">
+                    <label><i class="fas fa-fire"></i> Intrusion Heatmap</label>
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <span id="heatmapStatus" class="layer-status status-inactive"></span>
+                        <span id="heatmapStatusText" style="color: #94a3b8; font-size: 12px;">Currently Off</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap;">
+                        <button class="btn btn-sm" onclick="toggleHeatmap('Intruders')">
+                            <i class="fas fa-map"></i> Show Intruder Heatmap
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleHeatmap('all')">
+                            <i class="fas fa-globe"></i> All Activities
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="toggleHeatmap('off')">
+                            <i class="fas fa-power-off"></i> Hide Heatmap
+                        </button>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i> Heatmap shows concentration of activities. Red = high intensity, Blue = low intensity.
+                    </p>
                 </div>
 
                 <!-- UPDATED PIE CHART WITH MONTH SELECTOR -->
@@ -677,6 +743,15 @@
                     <select id="villageSelect" class="form-select">
                         <option value="">-- Choose Village --</option>
                     </select>
+
+                    <div style="display: flex; align-items: center; margin: 10px 0;">
+                        <span id="villagesStatus" class="layer-status status-inactive"></span>
+                        <span id="villagesStatusText" style="color: #94a3b8; font-size: 12px;">Villages Layer Off</span>
+                    </div>
+
+                    <button class="btn" onclick="toggleVillages()" style="width: 100%; margin-top: 5px;">
+                        <i class="fas fa-toggle-off"></i> <span id="villagesBtnText">Show Villages</span>
+                    </button>
 
                     <button class="btn" onclick="zoomToVillage()" style="width: 100%; margin-top: 15px;">
                         <i class="fas fa-search-location"></i> Zoom to Village
@@ -730,6 +805,10 @@
                         <label>Opacity: <span id="opacityValue">0.7</span></label>
                         <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
                     </div>
+                    
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i> Check boxes to enable LULC layers
+                    </p>
                 </div>
             </div>
 
@@ -741,8 +820,14 @@
 
                 <div class="control-group">
                     <label><i class="fas fa-eye"></i> Layer Control</label>
+                    
+                    <div style="display: flex; align-items: center; margin: 10px 0;">
+                        <span id="damsStatus" class="layer-status status-inactive"></span>
+                        <span id="damsStatusText" style="color: #94a3b8; font-size: 12px;">Dams Layer Off</span>
+                    </div>
+
                     <button class="btn" onclick="toggleDams()" style="width: 100%;">
-                        <i class="fas fa-toggle-on"></i> Toggle Dams Layer
+                        <i class="fas fa-toggle-off"></i> <span id="damsBtnText">Show Dams Layer</span>
                     </button>
 
                     <div class="stats-grid" style="margin-top: 15px;">
@@ -829,7 +914,18 @@
     <div class="legend-item"><span class="legend-color" style="background:#3af7ee;"></span> Wetland</div>
     <div class="legend-item"><span class="legend-color" style="background:#7e5937;"></span> Forest</div>
     <div class="legend-item"><span class="legend-color" style="background:#006600;"></span> trees</div>
-    <div class="legend-item"><span class="legend-color" style="background:#eded51;"></span> Agrilculrute!</div>
+    <div class="legend-item"><span class="legend-color" style="background:#eded51;"></span> Agriculture</div>
+</div>
+
+<!-- Heatmap Legend -->
+<div id="heatmapLegend" class="heatmap-legend" style="display: none;">
+    <h4 style="color: #dc2626; margin-bottom: 8px;"><i class="fas fa-fire"></i> Intrusion Intensity</h4>
+    <div class="heatmap-gradient"></div>
+    <div style="display: flex; justify-content: space-between;">
+        <span>Low</span>
+        <span>Medium</span>
+        <span>High</span>
+    </div>
 </div>
 
 <!-- Buffer Info -->
@@ -859,6 +955,7 @@
     map.createPane('villagesPane'); map.getPane('villagesPane').style.zIndex = 450;
     map.createPane('damsPane'); map.getPane('damsPane').style.zIndex = 460;
     map.createPane('bufferPane'); map.getPane('bufferPane').style.zIndex = 350;
+    map.createPane('heatmapPane'); map.getPane('heatmapPane').style.zIndex = 250;
 
     // ========== Basemaps (Google Hybrid as default) ==========
     var basemaps = {
@@ -882,36 +979,51 @@
     // Scale bar
     L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
-    // ========== Layer Groups ==========
+    // ========== Layer Groups (ALL OFF BY DEFAULT) ==========
     var farmLayers = {};
-    var activityLayer = L.layerGroup().addTo(map);
-    var villagesLayer = L.layerGroup().addTo(map);
-    var damsLayer = L.layerGroup().addTo(map);
+    var activityLayer = L.layerGroup(); // NOT added to map by default
+    var villagesLayer = L.layerGroup(); // NOT added to map by default
+    var damsLayer = L.layerGroup(); // NOT added to map by default
     var bufferLayer = L.layerGroup();
+    var heatmapLayer = null;
 
-    // ========== LULC Layers ==========
+    // ========== LULC Layers (ALL OFF BY DEFAULT) ==========
     var lulc2005 = L.tileLayer(
-        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/bc79a77a7f5ad3ea9eddf2e583589073-46371dab551b84665cdf3086cec1e56a/tiles/{z}/{x}/{y}",
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/bc79a77a7f5ad3ea9eddf2e583589073-55696e7c8e84926b4cce85e1c40ee914/tiles/{z}/{x}/{y}",
         { pane: 'lulcPane', opacity: 0.7 }
     );
     var lulc2015 = L.tileLayer(
-        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/dc191c4dd5c74646c729f082068f87c0-0b84a6194ac0ab5b73f43aeba34aa008/tiles/{z}/{x}/{y}",
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/dc191c4dd5c74646c729f082068f87c0-876642a806eb407fda08c8013331ff3e/tiles/{z}/{x}/{y}",
         { pane: 'lulcPane', opacity: 0.7 }
     );
     var lulc2025 = L.tileLayer(
-        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/4f4b200fa2f5da6cdab0277a5a823391-2ea7e2b7f21352df520277794b03f5e3/tiles/{z}/{x}/{y}",
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/4f4b200fa2f5da6cdab0277a5a823391-b21de90e68ed87e22b14d97cfc42464e/tiles/{z}/{x}/{y}",
         { pane: 'lulcPane', opacity: 0.7 }
     );
 
-    // LULC toggles
+    // LULC toggles - ONLY ADD WHEN CHECKED
     document.getElementById("lulc2005").addEventListener('change', function(e) {
-        e.target.checked ? lulc2005.addTo(map) : map.removeLayer(lulc2005);
+        if (e.target.checked) {
+            lulc2005.addTo(map);
+        } else {
+            map.removeLayer(lulc2005);
+        }
     });
+    
     document.getElementById("lulc2015").addEventListener('change', function(e) {
-        e.target.checked ? lulc2015.addTo(map) : map.removeLayer(lulc2015);
+        if (e.target.checked) {
+            lulc2015.addTo(map);
+        } else {
+            map.removeLayer(lulc2015);
+        }
     });
+    
     document.getElementById("lulc2025").addEventListener('change', function(e) {
-        e.target.checked ? lulc2025.addTo(map) : map.removeLayer(lulc2025);
+        if (e.target.checked) {
+            lulc2025.addTo(map);
+        } else {
+            map.removeLayer(lulc2025);
+        }
     });
 
     // Opacity control
@@ -935,7 +1047,16 @@
     // ========== UTM Conversion Helper ==========
     function utmToLatLng(easting, northing) {
         try {
-            var result = proj4("EPSG:32736", "EPSG:4326", [parseFloat(easting), parseFloat(northing)]);
+            // Parse as floats and validate
+            var east = parseFloat(easting);
+            var north = parseFloat(northing);
+            
+            if (isNaN(east) || isNaN(north)) {
+                console.error('Invalid UTM coordinates:', easting, northing);
+                return null;
+            }
+            
+            var result = proj4("EPSG:32736", "EPSG:4326", [east, north]);
             return { lat: result[1], lng: result[0] };
         } catch(e) {
             console.error('UTM conversion error:', e);
@@ -948,6 +1069,7 @@
     var totalFields = 0;
 
     function loadFarm(farmId) {
+        fieldCounts[farmId] = 0; // Reset count for this farm before loading
         fetch(`https://hamza-nkhumbwa.github.io/galanwra/Farm${farmId}.geojson`)
             .then(r => r.json())
             .then(data => {
@@ -967,8 +1089,8 @@
                             layer.bindPopup(`
                                 <div style="padding: 10px;">
                                     <h4 style="color: #dc2626; margin-bottom: 8px;">Field Details</h4>
-                                    <p><b>ID:</b> ${feature.properties.ID || 'N/A'}</p>
-                                    <p><b>Area (ha):</b> ${feature.properties['Area(ha)'] || feature.properties.AREA || 'N/A'}</p>
+                                    <p><b>ID:</b> ${feature.properties.ID || feature.properties.Id || feature.properties.id || feature.properties.FIELD_ID || feature.properties.Field || 'N/A'}</p>
+                                    <p><b>Area (ha):</b> ${feature.properties['Area (ha)'] || feature.properties['AREA (HA)'] || feature.properties['Area(ha)'] || feature.properties['Area_ha'] || feature.properties['AREA_HA'] || feature.properties.Area || 'N/A'}</p>
                                     <p><b>Farm:</b> ${farmId}</p>
                                 </div>
                             `);
@@ -993,6 +1115,10 @@
                 }
                 
                 updateVisibleFields();
+            })
+            .catch(error => {
+                console.error(`Error loading Farm ${farmId}:`, error);
+                alert(`⚠️ Failed to load Farm ${farmId}. Check if Farm${farmId}.geojson exists and is correctly named.`);
             });
     }
 
@@ -1098,15 +1224,17 @@
         });
     }
 
-    // ========== UPDATED: Activity Data from Activity.csv ==========
+    // ========== FIXED: Activity Data from Activity.csv ==========
     var activityData = [];
     var activityMarkers = [];
+    var heatmapPoints = [];
 
     function loadActivityData() {
         Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Activity.csv', {
             download: true,
             header: true,
             complete: function(results) {
+                console.log('Activity CSV loaded:', results.data.length, 'rows');
                 activityData = results.data;
                 displayActivities(activityData);
                 document.getElementById('totalIncidents').textContent = activityData.length;
@@ -1121,21 +1249,28 @@
     function displayActivities(data) {
         activityLayer.clearLayers();
         activityMarkers = [];
+        heatmapPoints = [];
         
         data.forEach(row => {
             if (row.Eastings && row.Northings) {
+                // FIX 1: Convert UTM to Lat/Lng
                 var latlng = utmToLatLng(row.Eastings, row.Northings);
                 if (latlng) {
+                    // FIX 2: Use correct column names
+                    var activity = row.Activity || 'Unknown';
+                    var cropFeature = row['Crop-Feature'] || row['Crop/Feature'] || row.Crop_Feature || 'N/A';
+                    var cropAge = row['Age-Crop'] || row['Crop Age'] || row.Crop_Age || 'N/A';
+                    
                     var marker = L.circleMarker([latlng.lat, latlng.lng], {
                         radius: 7,
-                        fillColor: getActivityColor(row.Activity),
+                        fillColor: getActivityColor(activity),
                         color: '#fff',
                         weight: 2,
                         fillOpacity: 0.9,
                         pane: 'activityPane'
                     });
                     
-                    // UPDATED: Detailed popup with all columns displayed vertically
+                    // FIX: Detailed popup with all columns
                     marker.bindPopup(`
                         <div style="padding: 12px; max-width: 300px;">
                             <h4 style="color: #dc2626; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px;">Activity Details</h4>
@@ -1144,9 +1279,9 @@
                                 <p><b>Field:</b> ${row.Field || 'N/A'}</p>
                                 <p><b>Eastings:</b> ${row.Eastings || 'N/A'}</p>
                                 <p><b>Northings:</b> ${row.Northings || 'N/A'}</p>
-                                <p><b>Crop/Feature:</b> ${row['Crop/Feature'] || 'N/A'}</p>
-                                <p><b>Crop Age:</b> ${row['Crop Age'] || 'N/A'}</p>
-                                <p><b>Activity:</b> ${row.Activity || 'N/A'}</p>
+                                <p><b>Crop/Feature:</b> ${cropFeature}</p>
+                                <p><b>Crop Age:</b> ${cropAge}</p>
+                                <p><b>Activity:</b> ${activity}</p>
                                 <p><b>Date:</b> ${row.Date || 'N/A'}</p>
                                 <p><b>Time:</b> ${row.Time || 'N/A'}</p>
                                 <p><b>Day/Night:</b> ${row['Day/Night'] || 'N/A'}</p>
@@ -1161,46 +1296,178 @@
                     
                     marker.addTo(activityLayer);
                     activityMarkers.push(marker);
+                    
+                    // Add to heatmap points (with frequency as intensity)
+                    var intensity = parseFloat(row.Frequency) || 1;
+                    heatmapPoints.push([latlng.lat, latlng.lng, intensity]);
                 }
             }
         });
         
+        console.log('Displayed', activityMarkers.length, 'activity markers');
         updateVisibleCount();
+        
+        // NOTE: activityLayer is NOT added to map by default
+        // User must select activities to see them
     }
 
     function getActivityColor(activity) {
-        return { 
+        // FIX 3: Match activity names exactly
+        var activityMap = {
             'Intruders': '#ef4444',
-            'Sweepers': '#f59e0b',
-            'Finsh-Mongers': '#10b981',
+            'Fish-Mongers': '#10b981',
             'Fuel Mongers': '#3b82f6',
+            'Sweepers': '#f59e0b',
             'Others': '#8b5cf6'
-        }[activity] || '#94a3b8';
+        };
+        
+        // Try to match regardless of case or extra spaces
+        var normalizedActivity = String(activity).trim();
+        for (var key in activityMap) {
+            if (normalizedActivity.toLowerCase().includes(key.toLowerCase())) {
+                return activityMap[key];
+            }
+        }
+        
+        return '#94a3b8'; // Default gray
     }
 
+    // ========== NEW: Heatmap Functionality ==========
+    function toggleHeatmap(type) {
+        // Remove existing heatmap if any
+        if (heatmapLayer) {
+            map.removeLayer(heatmapLayer);
+            heatmapLayer = null;
+        }
+        
+        // Hide legend initially
+        document.getElementById('heatmapLegend').style.display = 'none';
+        
+        // Update status indicators
+        var statusDot = document.getElementById('heatmapStatus');
+        var statusText = document.getElementById('heatmapStatusText');
+        
+        if (type === 'off') {
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Currently Off';
+            return; // Just hide heatmap
+        }
+        
+        // Filter points based on type
+        var points = [];
+        
+        if (type === 'all') {
+            points = heatmapPoints;
+            statusText.textContent = 'Showing: All Activities';
+        } else if (type === 'Intruders') {
+            // Filter for intruder activities only
+            points = [];
+            activityData.forEach((row, index) => {
+                if (row.Activity && row.Activity.toLowerCase().includes('intrud')) {
+                    var latlng = utmToLatLng(row.Eastings, row.Northings);
+                    if (latlng) {
+                        var intensity = parseFloat(row.Frequency) || 1;
+                        points.push([latlng.lat, latlng.lng, intensity]);
+                    }
+                }
+            });
+            statusText.textContent = 'Showing: Intruders Only';
+        }
+        
+        if (points.length === 0) {
+            alert('No activity points found for heatmap');
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'No data available';
+            return;
+        }
+        
+        // Create heatmap layer
+        heatmapLayer = L.heatLayer(points, {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            max: 1.0,
+            gradient: {
+                0.0: 'blue',
+                0.3: 'cyan',
+                0.5: 'lime',
+                0.7: 'yellow',
+                1.0: 'red'
+            },
+            pane: 'heatmapPane'
+        }).addTo(map);
+        
+        // Update status
+        statusDot.className = 'layer-status status-active';
+        
+        // Show legend
+        document.getElementById('heatmapLegend').style.display = 'block';
+        
+        // Optionally zoom to show all points
+        if (points.length > 0) {
+            var bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    }
+
+    // FIX 3: Update filter function to match activity names
     function selectAllActivities() {
         var select = document.getElementById('activitySelect');
         Array.from(select.options).forEach(o => o.selected = true);
         filterActivities();
+        
+        // Add activity layer to map if not already present
+        if (!map.hasLayer(activityLayer)) {
+            map.addLayer(activityLayer);
+        }
     }
 
     function clearAllActivities() {
         var select = document.getElementById('activitySelect');
         Array.from(select.options).forEach(o => o.selected = false);
         filterActivities();
+        
+        // Remove activity layer from map if no activities selected
+        if (map.hasLayer(activityLayer)) {
+            map.removeLayer(activityLayer);
+        }
     }
 
     function filterActivities() {
         var selected = Array.from(document.getElementById('activitySelect').selectedOptions).map(o => o.value);
         
+        // If nothing selected, remove layer from map
+        if (selected.length === 0) {
+            if (map.hasLayer(activityLayer)) {
+                map.removeLayer(activityLayer);
+            }
+            updateVisibleCount();
+            return;
+        }
+        
+        // Add layer to map if not already present
+        if (!map.hasLayer(activityLayer)) {
+            map.addLayer(activityLayer);
+        }
+        
+        // Filter visible markers
         activityLayer.eachLayer(layer => {
-            var content = layer.getPopup().getContent();
-            var match = selected.length === 0 || selected.some(s => content.includes(s));
+            var popupContent = layer.getPopup().getContent();
+            var match = false;
             
-            if (match) {
-                if (!map.hasLayer(layer)) layer.addTo(activityLayer);
-            } else {
+            for (var i = 0; i < selected.length; i++) {
+                if (popupContent.includes(selected[i])) {
+                    match = true;
+                    break;
+                }
+            }
+            
+            if (!match) {
                 if (map.hasLayer(layer)) layer.remove();
+            } else {
+                if (!map.hasLayer(layer)) layer.addTo(activityLayer);
             }
         });
         
@@ -1215,7 +1482,45 @@
 
     document.getElementById('activitySelect').addEventListener('change', filterActivities);
 
-    // ========== NEW: Monthly Pie Chart from PieChat.csv ==========
+    // ========== Villages Toggle ==========
+    function toggleVillages() {
+        var btn = document.getElementById('villagesBtnText');
+        var statusDot = document.getElementById('villagesStatus');
+        var statusText = document.getElementById('villagesStatusText');
+        
+        if (map.hasLayer(villagesLayer)) {
+            map.removeLayer(villagesLayer);
+            btn.innerHTML = 'Show Villages';
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Villages Layer Off';
+        } else {
+            map.addLayer(villagesLayer);
+            btn.innerHTML = 'Hide Villages';
+            statusDot.className = 'layer-status status-active';
+            statusText.textContent = 'Villages Layer On';
+        }
+    }
+
+    // ========== Dams Toggle ==========
+    function toggleDams() {
+        var btn = document.getElementById('damsBtnText');
+        var statusDot = document.getElementById('damsStatus');
+        var statusText = document.getElementById('damsStatusText');
+        
+        if (map.hasLayer(damsLayer)) {
+            map.removeLayer(damsLayer);
+            btn.innerHTML = 'Show Dams Layer';
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Dams Layer Off';
+        } else {
+            map.addLayer(damsLayer);
+            btn.innerHTML = 'Hide Dams Layer';
+            statusDot.className = 'layer-status status-active';
+            statusText.textContent = 'Dams Layer On';
+        }
+    }
+
+    // ========== Monthly Pie Chart from PieChat.csv ==========
     var activityPieChart;
     var pieChartData = {};
 
@@ -1306,7 +1611,7 @@
         });
     }
 
-    // ========== NEW: Bar Chart from Bargraph.csv ==========
+    // ========== Bar Chart from Bargraph.csv ==========
     var activityBarChart;
 
     function loadBarChartData() {
@@ -1412,16 +1717,28 @@
                             opt.textContent = props.NAME;
                             select.appendChild(opt);
                         }
+                        
+                        layer.addTo(villagesLayer);
                     }
-                }).addTo(villagesLayer);
+                });
                 
                 document.getElementById('totalVillages').textContent = count;
+                
+                // Note: villagesLayer is NOT added to map by default
             });
     }
 
     function zoomToVillage() {
         var name = document.getElementById('villageSelect').value;
         if (!name) { alert('Select a village'); return; }
+        
+        // Make sure villages layer is visible
+        if (!map.hasLayer(villagesLayer)) {
+            map.addLayer(villagesLayer);
+            document.getElementById('villagesBtnText').innerHTML = 'Hide Villages';
+            document.getElementById('villagesStatus').className = 'layer-status status-active';
+            document.getElementById('villagesStatusText').textContent = 'Villages Layer On';
+        }
         
         villagesLayer.eachLayer(layer => {
             if (layer.getPopup().getContent().includes(name)) {
@@ -1433,7 +1750,7 @@
 
     // ========== Transition Statistics ==========
     function loadTransitionData() {
-        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/ALUMENDA%20EXCEL.csv', {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/ALUMENDA.csv', {
             download: true,
             header: true,
             complete: function(results) {
@@ -1480,15 +1797,14 @@
                     }),
                     onEachFeature: (f, layer) => {
                         layer.bindPopup(`<b>Dam ID:</b> ${f.properties?.ID || 'N/A'}`);
+                        layer.addTo(damsLayer);
                     }
-                }).addTo(damsLayer);
+                });
                 
                 document.getElementById('totalDams').textContent = data.features.length;
+                
+                // Note: damsLayer is NOT added to map by default
             });
-    }
-
-    function toggleDams() {
-        map.hasLayer(damsLayer) ? map.removeLayer(damsLayer) : map.addLayer(damsLayer);
     }
 
     // ========== Buffer Analysis ==========
@@ -1604,5 +1920,4 @@
 </script>
 
 </body>
-
 </html>
