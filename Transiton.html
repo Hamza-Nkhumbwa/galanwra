@@ -34,9 +34,9 @@
             height: 100%;
             object-fit: cover;
             z-index: -2;
-            opacity: 0.95;
+            opacity: 0.35;
             pointer-events: none;
-            filter: blur(3px) brightness(0.95);
+            filter: blur(3px) brightness(0.7);
             transform: scale(1.02);
         }
 
@@ -438,13 +438,13 @@
             <table id="dataTable">
                 <thead>汽<th>Land Class</th><th>2005</th><th>2015</th><th>2025</th><th>Δ 2005→2025</th> </thead>
                 <tbody id="tableBody"></tbody>
-             </table>
+              </table>
         </div>
     </div>
     
     <div class="footer-note">
         <i class="fas fa-globe-africa"></i> Data source: Alumenda LULC assessment · 20‑year transition · Dashboard supports sustainable planning
-        <div class="insight-badge"><i class="fas fa-chart-simple"></i> Agriculture +2,978 ha | Wetlands recovering | Trees +1,030 ha</div>
+        <div class="insight-badge"><i class="fas fa-chart-simple"></i> Field Crop Production +2,978 ha | Wetlands recovering | Trees +1,030 ha</div>
         <div class="author-credit">
             <i class="fas fa-code"></i> Developed by <strong>Hamza Nkhumbwa (GIS)</strong> <i class="fas fa-map"></i> | Professional Land Cover Analysis
         </div>
@@ -453,7 +453,8 @@
 
 <script>
     // ---- LAND COVER DATASET (exactly from CSV) ----
-    const classes = ["Water", "Sugarcane", "Built-up", "Bare land", "Roads", "Wetlands", "Tracks", "Trees", "Agriculture"];
+    // Updated: "Agriculture" changed to "Field Crop Production" throughout
+    const classes = ["Water", "Sugarcane", "Built-up", "Bare land", "Roads", "Wetlands", "Tracks", "Trees", "Field Crop Production"];
     const values2005 = [456.6, 2990.71, 1682.7, 5139.66, 557.26, 3977.5, 1977, 3255.44, 5114.28];
     const values2015 = [160.74, 3464.44, 1914.86, 2115.56, 409.96, 2254.67, 1481.55, 3599.70, 10652.15];
     const values2025 = [662.12, 3608.43, 2235.21, 1734.06, 398.21, 3385.51, 1465.00, 4285.86, 8092.8];
@@ -475,22 +476,22 @@
         <div class="kpi-card"><div class="kpi-year"><i class="fas fa-arrows-spin"></i> 20‑year Δ</div><div class="kpi-value">${deltaTotal>=0?'+':''}${formatNum(deltaTotal)}</div><div class="kpi-label">Overall change (ha)</div></div>
     `;
 
-    // table rows
+    // table rows with updated label
     const tbody = document.getElementById('tableBody');
     for(let i=0; i<classes.length; i++) {
         const delta = values2025[i] - values2005[i];
         const deltaClr = delta>=0 ? '#c2f0a6' : '#ffb08c';
-        const row = `<tr>
+        const row = `汽
             <td><i class="fas fa-map-pin"></i> ${classes[i]}</td>
             <td>${values2005[i].toFixed(2)}</td>
             <td>${values2015[i].toFixed(2)}</td>
             <td>${values2025[i].toFixed(2)}</td>
             <td style="color:${deltaClr}; font-weight:500;">${delta>=0?'+':''}${delta.toFixed(2)}</td>
-        </tr>`;
+         </tr>`;
         tbody.insertAdjacentHTML('beforeend', row);
     }
 
-    // ---- BAR CHART ----
+    // ---- BAR CHART with updated labels ----
     const barCtx = document.getElementById('barChart').getContext('2d');
     new Chart(barCtx, {
         type: 'bar',
@@ -512,9 +513,9 @@
         }
     });
 
-    // ---- LINE CHART with CUSTOM COLORS ----
+    // ---- LINE CHART with CUSTOM COLORS - updated label to "Field Crop Production" ----
     const lineIndices = {
-        'Agriculture': classes.indexOf('Agriculture'),
+        'Field Crop Production': classes.indexOf('Field Crop Production'),
         'Water': classes.indexOf('Water'),
         'Wetlands': classes.indexOf('Wetlands'),
         'Trees': classes.indexOf('Trees'),
@@ -522,7 +523,7 @@
     };
     
     const lineDatasets = [
-        { label: 'Agriculture', data: [values2005[lineIndices.Agriculture], values2015[lineIndices.Agriculture], values2025[lineIndices.Agriculture]], 
+        { label: 'Field Crop Production', data: [values2005[lineIndices['Field Crop Production']], values2015[lineIndices['Field Crop Production']], values2025[lineIndices['Field Crop Production']]], 
           borderColor: '#eded51', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#eded51', pointBorderColor: '#fff', fill: false },
         { label: 'Water', data: [values2005[lineIndices.Water], values2015[lineIndices.Water], values2025[lineIndices.Water]], 
           borderColor: '#3264d6', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#3264d6', pointBorderColor: '#fff', fill: false },
