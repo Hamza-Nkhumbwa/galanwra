@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Alumenda | Professional Land Cover Dashboard</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Font Awesome 6 (free icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts: Inter + Poppins for modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a1f0e;
+            color: #eef5e9;
+            line-height: 1.4;
+            overflow-x: hidden;
+        }
+
+        /* ---- TOPBAR ANIMATION (VIDEO BACKGROUND) ---- */
+        .topbar-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+            opacity: 0.35;
+            pointer-events: none;
+            filter: blur(3px) brightness(0.7);
+            transform: scale(1.02);
+        }
+
+        /* overlay gradient to improve readability */
+        .gradient-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 30%, rgba(10,30,8,0.75), rgba(2,15,3,0.92));
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* main dashboard container */
+        .dashboard {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 1.8rem 2rem 2.5rem;
+            position: relative;
+            backdrop-filter: blur(1px);
+        }
+
+        /* header with logo and title */
+        .header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            background: rgba(10, 25, 8, 0.55);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            padding: 0.8rem 1.8rem;
+            border: 1px solid rgba(120, 180, 100, 0.4);
+            box-shadow: 0 12px 28px -8px rgba(0,0,0,0.3);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-area img {
+            height: 52px;
+            width: auto;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+            transition: transform 0.25s ease;
+        }
+        .logo-area img:hover { transform: scale(1.02); }
+
+        .title-text h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.9rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #e1ffc4, #a3e081);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+        .title-text p {
+            font-size: 0.8rem;
+            color: #c7e6b9;
+            font-weight: 400;
+            margin-top: 4px;
+        }
+
+        .badge-year {
+            background: #1e3a1ecc;
+            padding: 0.4rem 1rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            backdrop-filter: blur(4px);
+            border: 1px solid #6f9e55;
+        }
+        .badge-year i { margin-right: 6px; color: #b9f6a5; }
+
+        /* KPI cards glassmorphism */
+        .kpi-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.2rem;
+            margin-bottom: 2.5rem;
+        }
+        .kpi-card {
+            background: rgba(20, 35, 18, 0.65);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            padding: 1rem 1.5rem;
+            flex: 1;
+            min-width: 130px;
+            border: 1px solid rgba(110, 170, 80, 0.5);
+            transition: all 0.25s;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            background: rgba(30, 55, 26, 0.8);
+            border-color: #b0e08f;
+            box-shadow: 0 15px 25px -12px black;
+        }
+        .kpi-year { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #bce0a5; }
+        .kpi-value { font-size: 2rem; font-weight: 700; margin: 0.3rem 0; font-feature-settings: "tnum"; color: #f2ffe6; }
+        .kpi-label { font-size: 0.7rem; opacity: 0.8; }
+
+        /* chart row */
+        .chart-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.8rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            flex: 1;
+            background: rgba(15, 28, 12, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            padding: 1.2rem 1rem;
+            border: 1px solid rgba(100, 160, 70, 0.5);
+            transition: all 0.2s;
+        }
+        .chart-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #86d46b;
+            padding-left: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        canvas { max-height: 300px; width: 100%; }
+
+        /* Map section — elegant design */
+        .map-section {
+            background: rgba(10, 22, 8, 0.65);
+            backdrop-filter: blur(8px);
+            border-radius: 1.8rem;
+            margin: 1rem 0 1.5rem;
+            border: 1px solid rgba(100, 170, 70, 0.6);
+            overflow: hidden;
+        }
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid #467a3a;
+        }
+        .map-header h3 {
+            font-weight: 600;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .expand-btn {
+            background: linear-gradient(135deg, #2d6a2a, #1e4a1a);
+            border: none;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.2s;
+            padding: 0.5rem 1.2rem;
+            border-radius: 40px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .expand-btn:hover { 
+            transform: scale(1.02);
+            background: linear-gradient(135deg, #3e823a, #2a6024);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .map-container {
+            background: #051003;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            padding: 1.5rem;
+        }
+        .map-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            cursor: pointer;
+            transition: 0.2s;
+            max-height: 450px;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        /* FULLSCREEN MAP MODAL - PERFECT CENTERING FIX */
+        .map-fullscreen-modal {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.96) !important;
+            backdrop-filter: blur(20px) !important;
+            z-index: 10000 !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+        }
+        
+        .map-fullscreen-modal .map-container {
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-height: auto !important;
+            width: auto !important;
+            height: auto !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            cursor: pointer !important;
+        }
+        
+        .map-fullscreen-modal img {
+            max-width: 90vw !important;
+            max-height: 85vh !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            border-radius: 20px !important;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5) !important;
+            cursor: pointer !important;
+        }
+        
+        .map-fullscreen-modal .map-header {
+            position: fixed !important;
+            top: 20px !important;
+            right: 20px !important;
+            left: auto !important;
+            background: rgba(0,0,0,0.7) !important;
+            backdrop-filter: blur(12px);
+            border: 1px solid #6f9e55;
+            border-radius: 40px !important;
+            width: auto !important;
+            padding: 0.6rem 1.2rem !important;
+            z-index: 10001 !important;
+            cursor: pointer;
+        }
+        
+        .map-fullscreen-modal .expand-btn {
+            background: #c44536;
+            padding: 0.4rem 1rem;
+        }
+        
+        .map-fullscreen-modal .expand-btn:hover {
+            background: #a03426;
+        }
+
+        /* data table */
+        .data-section {
+            background: rgba(12, 26, 10, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            padding: 1.2rem;
+            border: 1px solid #457a3a;
+            overflow-x: auto;
+        }
+        .data-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        th, td {
+            padding: 0.7rem 0.5rem;
+            text-align: right;
+            border-bottom: 1px solid #386a2e;
+        }
+        th:first-child, td:first-child { text-align: left; font-weight: 600; background: #16281280; }
+        th { background: #1f3a1a; color: #e0f5cf; font-weight: 600; }
+        tr:hover td { background: #254d1f40; }
+
+        .footer-note {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            opacity: 0.8;
+            padding-top: 1rem;
+            border-top: 1px solid #386a2e;
+        }
+        
+        .author-credit {
+            margin-top: 0.8rem;
+            font-size: 0.8rem;
+            color: #b8e0a8;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .author-credit i {
+            margin: 0 4px;
+        }
+        
+        i { margin-right: 5px; }
+
+        .insight-badge {
+            background: linear-gradient(135deg, #2a6b2a, #1e4a1e);
+            border-radius: 40px;
+            padding: 0.3rem 1rem;
+            font-size: 0.7rem;
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 780px) {
+            .dashboard { padding: 1rem; }
+            .title-text h1 { font-size: 1.4rem; }
+            .kpi-value { font-size: 1.5rem; }
+            .map-container { min-height: 280px; }
+            .map-container img { max-height: 280px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Topbar Animation: earth.mp4 -->
+<video class="topbar-video" autoplay muted loop playsinline>
+    <source src="https://hamza-nkhumbwa.github.io/datasets/earth.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+<div class="gradient-overlay"></div>
+
+<div class="dashboard">
+    <!-- HEADER with WWJD Logo -->
+    <div class="header-flex">
+        <div class="logo-area">
+            <img src="https://hamza-nkhumbwa.github.io/galanwra/wwjdlogo.png" alt="WWJD Logo" onerror="this.onerror=null; this.src='https://via.placeholder.com/52?text=WWJD';">
+            <div class="title-text">
+                <h1><i class="fas fa-chart-line"></i> ALUMENDA · LAND COVER DASHBOARD</h1>
+                <p>multi‑temporal analysis | hectares | 2005–2025</p>
+            </div>
+        </div>
+        <div class="badge-year">
+            <i class="fas fa-calendar-alt"></i> Dynamic LULC · Professional Edition
+        </div>
+    </div>
+
+    <!-- KPI CARDS (dynamic) -->
+    <div class="kpi-grid" id="kpiContainer"></div>
+
+    <!-- CHARTS ROW: Bar + Line -->
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3><i class="fas fa-chart-bar" style="color:#9bde7e;"></i> Land cover comparison (ha)</h3>
+            <canvas id="barChart" width="500" height="280"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3><i class="fas fa-chart-line" style="color:#9bde7e;"></i> Key trends: 2005 → 2025</h3>
+            <canvas id="lineChart" width="500" height="280"></canvas>
+        </div>
+    </div>
+
+    <!-- MAP SECTION: Expandable LULC Map with Perfect Centering -->
+    <div class="map-section" id="mapSection">
+        <div class="map-header">
+            <h3><i class="fas fa-map-marked-alt"></i> Land Use / Land Cover Map (Alumenda)</h3>
+            <button class="expand-btn" id="expandMapBtn"><i class="fas fa-expand"></i> View Fullscreen</button>
+        </div>
+        <div class="map-container" id="mapContainer">
+            <img id="lulcMapImg" src="https://hamza-nkhumbwa.github.io/galanwra/LULC.png" 
+                 alt="ALUMENDA LULC Map - Land Use Land Cover"
+                 style="max-height: 420px; width: auto; margin: 0 auto; border-radius: 16px; cursor: pointer;"
+                 onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\'padding:2rem;text-align:center; background:rgba(0,0,0,0.6);border-radius:1rem\'><i class=\'fas fa-map fa-2x\'></i><br>Map preview unavailable — <strong>LULC.png</strong><br>Please verify the image link.</div>';">
+        </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="data-section">
+        <h3><i class="fas fa-table-list"></i> Full land cover matrix (hectares)</h3>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>汽<th>Land Class</th><th>2005</th><th>2015</th><th>2025</th><th>Δ 2005→2025</th> </thead>
+                <tbody id="tableBody"></tbody>
+             </table>
+        </div>
+    </div>
+    
+    <div class="footer-note">
+        <i class="fas fa-globe-africa"></i> Data source: Alumenda LULC assessment · 20‑year transition · Dashboard supports sustainable planning
+        <div class="insight-badge"><i class="fas fa-chart-simple"></i> Agriculture +2,978 ha | Wetlands recovering | Trees +1,030 ha</div>
+        <div class="author-credit">
+            <i class="fas fa-code"></i> Developed by <strong>Hamza Nkhumbwa (GIS)</strong> <i class="fas fa-map"></i> | Professional Land Cover Analysis
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---- LAND COVER DATASET (exactly from CSV) ----
+    const classes = ["Water", "Sugarcane", "Built-up", "Bare land", "Roads", "Wetlands", "Tracks", "Trees", "Agriculture"];
+    const values2005 = [456.6, 2990.71, 1682.7, 5139.66, 557.26, 3977.5, 1977, 3255.44, 5114.28];
+    const values2015 = [160.74, 3464.44, 1914.86, 2115.56, 409.96, 2254.67, 1481.55, 3599.70, 10652.15];
+    const values2025 = [662.12, 3608.43, 2235.21, 1734.06, 398.21, 3385.51, 1465.00, 4285.86, 8092.8];
+
+    // totals for KPIs
+    const total2005 = values2005.reduce((a,b)=>a+b,0);
+    const total2015 = values2015.reduce((a,b)=>a+b,0);
+    const total2025 = values2025.reduce((a,b)=>a+b,0);
+    const deltaTotal = total2025 - total2005;
+
+    function formatNum(num) { return num.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+    // render KPI
+    const kpiContainer = document.getElementById('kpiContainer');
+    kpiContainer.innerHTML = `
+        <div class="kpi-card"><div class="kpi-year"><i class="fas fa-tree"></i> 2005</div><div class="kpi-value">${formatNum(total2005)}</div><div class="kpi-label">Total area (ha)</div></div>
+        <div class="kpi-card"><div class="kpi-year"><i class="fas fa-chart-simple"></i> 2015</div><div class="kpi-value">${formatNum(total2015)}</div><div class="kpi-label">Total area (ha)</div></div>
+        <div class="kpi-card"><div class="kpi-year"><i class="fas fa-chart-line"></i> 2025</div><div class="kpi-value">${formatNum(total2025)}</div><div class="kpi-label">Total area (ha)</div></div>
+        <div class="kpi-card"><div class="kpi-year"><i class="fas fa-arrows-spin"></i> 20‑year Δ</div><div class="kpi-value">${deltaTotal>=0?'+':''}${formatNum(deltaTotal)}</div><div class="kpi-label">Overall change (ha)</div></div>
+    `;
+
+    // table rows
+    const tbody = document.getElementById('tableBody');
+    for(let i=0; i<classes.length; i++) {
+        const delta = values2025[i] - values2005[i];
+        const deltaClr = delta>=0 ? '#c2f0a6' : '#ffb08c';
+        const row = `<tr>
+            <td><i class="fas fa-map-pin"></i> ${classes[i]}</td>
+            <td>${values2005[i].toFixed(2)}</td>
+            <td>${values2015[i].toFixed(2)}</td>
+            <td>${values2025[i].toFixed(2)}</td>
+            <td style="color:${deltaClr}; font-weight:500;">${delta>=0?'+':''}${delta.toFixed(2)}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+    }
+
+    // ---- BAR CHART ----
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: classes,
+            datasets: [
+                { label: '2005', data: values2005, backgroundColor: '#82b474', borderRadius: 6, barPercentage: 0.7 },
+                { label: '2015', data: values2015, backgroundColor: '#519c42', borderRadius: 6 },
+                { label: '2025', data: values2025, backgroundColor: '#2d7a26', borderRadius: 6 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { position: 'top', labels: { color: '#e0f0da', font: { size: 11 } } }, tooltip: { mode: 'index' } },
+            scales: {
+                y: { title: { display: true, text: 'Hectares', color: '#cde6c0' }, grid: { color: '#3a6332' }, ticks: { color: '#e2f0da' } },
+                x: { ticks: { color: '#eef5e8', rotation: 30, font: { size: 9 } }, grid: { display: false } }
+            }
+        }
+    });
+
+    // ---- LINE CHART with CUSTOM COLORS ----
+    const lineIndices = {
+        'Agriculture': classes.indexOf('Agriculture'),
+        'Water': classes.indexOf('Water'),
+        'Wetlands': classes.indexOf('Wetlands'),
+        'Trees': classes.indexOf('Trees'),
+        'Bare land': classes.indexOf('Bare land')
+    };
+    
+    const lineDatasets = [
+        { label: 'Agriculture', data: [values2005[lineIndices.Agriculture], values2015[lineIndices.Agriculture], values2025[lineIndices.Agriculture]], 
+          borderColor: '#eded51', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#eded51', pointBorderColor: '#fff', fill: false },
+        { label: 'Water', data: [values2005[lineIndices.Water], values2015[lineIndices.Water], values2025[lineIndices.Water]], 
+          borderColor: '#3264d6', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#3264d6', pointBorderColor: '#fff', fill: false },
+        { label: 'Wetlands', data: [values2005[lineIndices.Wetlands], values2015[lineIndices.Wetlands], values2025[lineIndices.Wetlands]], 
+          borderColor: '#3af7ee', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#3af7ee', pointBorderColor: '#fff', fill: false },
+        { label: 'Trees', data: [values2005[lineIndices.Trees], values2015[lineIndices.Trees], values2025[lineIndices.Trees]], 
+          borderColor: '#5bf82f', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#5bf82f', pointBorderColor: '#fff', fill: false },
+        { label: 'Bare land', data: [values2005[lineIndices['Bare land']], values2015[lineIndices['Bare land']], values2025[lineIndices['Bare land']]], 
+          borderColor: '#e4dddd', backgroundColor: 'transparent', borderWidth: 3, tension: 0.2, pointRadius: 5, pointBackgroundColor: '#e4dddd', pointBorderColor: '#fff', fill: false }
+    ];
+    
+    const lineCtx = document.getElementById('lineChart').getContext('2d');
+    new Chart(lineCtx, {
+        type: 'line',
+        data: { labels: ['2005', '2015', '2025'], datasets: lineDatasets },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { 
+                legend: { position: 'top', labels: { color: '#e0f0da', font: { size: 11, weight: '500' } } },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                y: { title: { display: true, text: 'Area (ha)', color: '#c6e2b5' }, grid: { color: '#3e6137' }, ticks: { color: '#e2f0da' } },
+                x: { ticks: { color: '#edf7e5', font: { size: 12, weight: 'bold' } } }
+            }
+        }
+    });
+
+    // ---- PERFECT MAP EXPANSION WITH MODAL APPROACH (FIXED CENTERING) ----
+    const originalMapSection = document.getElementById('mapSection');
+    const expandBtnMap = document.getElementById('expandMapBtn');
+    const mapImgElement = document.getElementById('lulcMapImg');
+    let fullscreenModal = null;
+    
+    function openFullscreenMap() {
+        // Create modal element
+        fullscreenModal = document.createElement('div');
+        fullscreenModal.className = 'map-fullscreen-modal';
+        
+        // Clone the header and container structure
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'map-header';
+        modalHeader.innerHTML = `
+            <h3><i class="fas fa-map-marked-alt"></i> Land Use / Land Cover Map (Alumenda)</h3>
+            <button class="expand-btn" id="closeFullscreenBtn"><i class="fas fa-compress"></i> Exit Fullscreen</button>
+        `;
+        
+        const modalContainer = document.createElement('div');
+        modalContainer.className = 'map-container';
+        
+        // Clone the image or use original
+        const modalImg = document.createElement('img');
+        modalImg.src = mapImgElement.src;
+        modalImg.alt = mapImgElement.alt;
+        modalImg.style.maxWidth = '90vw';
+        modalImg.style.maxHeight = '85vh';
+        modalImg.style.width = 'auto';
+        modalImg.style.height = 'auto';
+        modalImg.style.objectFit = 'contain';
+        modalImg.style.borderRadius = '20px';
+        modalImg.style.cursor = 'pointer';
+        
+        modalContainer.appendChild(modalImg);
+        fullscreenModal.appendChild(modalHeader);
+        fullscreenModal.appendChild(modalContainer);
+        
+        // Add to body
+        document.body.appendChild(fullscreenModal);
+        document.body.style.overflow = 'hidden';
+        
+        // Close function
+        function closeFullscreen() {
+            if (fullscreenModal && fullscreenModal.parentNode) {
+                fullscreenModal.remove();
+                fullscreenModal = null;
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Close on button click
+        const closeBtn = modalHeader.querySelector('#closeFullscreenBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeFullscreen();
+            });
+        }
+        
+        // Close on background click
+        fullscreenModal.addEventListener('click', (e) => {
+            if (e.target === fullscreenModal || e.target === modalContainer) {
+                closeFullscreen();
+            }
+        });
+        
+        // Close on ESC key
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeFullscreen();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    }
+    
+    // Attach click events
+    if (expandBtnMap) {
+        expandBtnMap.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFullscreenMap();
+        });
+    }
+    
+    if (mapImgElement) {
+        mapImgElement.addEventListener('click', () => {
+            openFullscreenMap();
+        });
+    }
+    
+    // Handle map image error gracefully
+    if(mapImgElement) {
+        mapImgElement.onerror = () => {
+            const parent = document.getElementById('mapContainer');
+            if(parent && !parent.querySelector('.map-error-msg')) {
+                const errSpan = document.createElement('div');
+                errSpan.className = 'map-error-msg';
+                errSpan.style.padding = '1.5rem';
+                errSpan.style.background = '#2a241ecc';
+                errSpan.style.borderRadius = '20px';
+                errSpan.style.margin = '1rem';
+                errSpan.style.textAlign = 'center';
+                errSpan.innerHTML = '<i class="fas fa-exclamation-triangle fa-2x"></i><br>LULC map not reachable.<br>Please verify: galanwra/LULC.png';
+                parent.appendChild(errSpan);
+                mapImgElement.style.display = 'none';
+            }
+        };
+        mapImgElement.onload = () => {
+            const existingError = document.querySelector('#mapContainer .map-error-msg');
+            if(existingError) existingError.remove();
+            if(mapImgElement) mapImgElement.style.display = 'block';
+        };
+    }
+    
+    // Animate KPI cards on load
+    setTimeout(() => {
+        document.querySelectorAll('.kpi-card').forEach((card, idx) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.4s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, idx * 80);
+        });
+    }, 100);
+</script>
+</body>
+</html>
