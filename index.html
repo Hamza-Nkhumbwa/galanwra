@@ -1,399 +1,2320 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Borehole Dashboard - Malawi</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alumenda Security Intelligence Dashboard</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Papa Parse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Proj4 for UTM conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <!-- Leaflet.heat for heatmap -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    #map {
-      width: 100%;
-      height: 60vh;
-    }
-    #sidebar {
-      width: 100%;
-      padding: 10px;
-      background-color: #f8f9fa;
-      overflow-y: auto;
-      border-left: 1px solid #ddd;
-      height: 40vh;
-    }
-    canvas {
-      width: 100%;
-      height: 300px;
-    }
-    #searchBar {
-      margin-bottom: 10px;
-      padding: 5px;
-      width: 100%;
-    }
-    #submergence {
-      margin-top: 20px;
-      background-color: #ffeeba;
-      padding: 10px;
-      border: 1px solid #ffc107;
-    }
-    #exportBtn, #toggleHeatmap, #clearSearch, #downloadBtn {
-      margin-top: 10px;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      cursor: pointer;
-      border-radius: 5px;
-      width: 100%;
-    }
-    #exportBtn { background-color: #28a745; }
-    #toggleHeatmap { background-color: #ffc107; color: black; }
-    #clearSearch { background-color: #6c757d; }
-    #districtSelector {
-      width: 100%;
-      margin-top: 10px;
-      padding: 5px;
-    }
-    @media (min-width: 768px) {
-      body { flex-direction: row; }
-      #map { width: 70%; height: 100vh; }
-      #sidebar { width: 30%; height: 100vh; }
-    }
-  </style>
+        body {
+            overflow: hidden;
+            height: 100vh;
+            background: #0a0c14;
+        }
+
+        /* Top Navigation */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(10, 20, 30, 0.98);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            color: white;
+            z-index: 1000;
+            border-bottom: 3px solid #dc2626;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo {
+            height: 65px;
+            width: auto;
+            background: white;
+            padding: 5px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.3);
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #fff, #fca5a5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .video-container {
+            width: 85px;
+            height: 55px;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid #dc2626;
+        }
+
+        .top-video {
+            width: 96%;
+            height: 120%;
+            object-fit: cover;
+        }
+
+        /* Main Layout */
+        #container {
+            display: flex;
+            margin-top: 70px;
+            height: calc(100vh - 70px);
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 500px;
+            display: flex;
+            background: #111827;
+            border-right: 2px solid #1f2937;
+        }
+
+        .tabs-container {
+            width: 130px;
+            background: #0f172a;
+            display: flex;
+            flex-direction: column;
+            padding: 15px 0;
+        }
+
+        .tab {
+            padding: 12px 8px;
+            margin: 3px 10px;
+            cursor: pointer;
+            border-radius: 8px;
+            background: #1e293b;
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .tab i {
+            font-size: 14px;
+            width: 20px;
+        }
+
+        .tab:hover {
+            background: #2d3748;
+            color: #e2e8f0;
+            transform: translateX(3px);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            border-left-color: #fff;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+        }
+
+        .tab-content-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #111827;
+            color: #f1f5f9;
+            scrollbar-width: thin;
+            scrollbar-color: #dc2626 #1e293b;
+        }
+
+        .tab-content-container::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .tab-content-container::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .tab-content-container::-webkit-scrollbar-thumb {
+            background: #dc2626;
+            border-radius: 10px;
+        }
+
+        .tabContent {
+            display: none;
+        }
+
+        .tabContent.active-content {
+            display: block;
+            animation: fade 0.3s ease;
+        }
+
+        @keyframes fade {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Control Groups */
+        .control-group {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 18px;
+            border: 1px solid #334155;
+        }
+
+        .section-header {
+            font-size: 14px;
+            font-weight: 700;
+            color: #dc2626;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        label {
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-select, input[type="text"], input[type="password"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: white;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .form-select:focus, input:focus {
+            outline: none;
+            border-color: #dc2626;
+        }
+
+        .form-select option {
+            background: #1e293b;
+            color: white;
+            padding: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            border: none;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            transition: all 0.2s;
+            border: 1px solid #ef4444;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 38, 38, 0.4);
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-color: #fbbf24;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4b5563, #374151);
+            border-color: #6b7280;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 12px 0;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #0f172a;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #334155;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            accent-color: #dc2626;
+            width: 16px;
+            height: 16px;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 10px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #dc2626;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #dc2626;
+            border: 2px solid white;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .stat-card {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 10px;
+            border-left: 4px solid #dc2626;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #334155;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        canvas {
+            width: 100% !important;
+            display: block;
+        }
+
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+            height: 200px;
+        }
+
+        .chart-wrap-tall {
+            position: relative;
+            width: 100%;
+            height: 260px;
+        }
+
+        .chart-wrap-sm {
+            position: relative;
+            width: 100%;
+            height: 160px;
+        }
+
+        /* Month selector for pie chart */
+        .month-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .month-selector select {
+            width: 150px;
+            padding: 8px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            color: white;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        /* Map */
+        #map {
+            flex: 1;
+            background: #0a0c14;
+        }
+
+        /* Legend */
+        .legend {
+            position: relative;
+    margin-top: 10px;
+    background: rgba(15, 23, 42, 0.9);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 11px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 18px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            max-width: 260px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .legend h4 {
+            margin-bottom: 12px;
+            color: #dc2626;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* Heatmap Legend */
+        .heatmap-legend {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            font-size: 12px;
+        }
+
+        .heatmap-gradient {
+            width: 200px;
+            height: 20px;
+            background: linear-gradient(to right, blue, cyan, lime, yellow, red);
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            width: 350px;
+            border: 2px solid #dc2626;
+        }
+
+        .modal-content h3 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        /* Buffer Info */
+        .buffer-info {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 2px solid #dc2626;
+            color: white;
+            z-index: 800;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* Farm Selection Status */
+        .selection-status {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            color: #94a3b8;
+            font-size: 12px;
+            border-left: 3px solid #dc2626;
+        }
+
+        /* Expand button for charts */
+        .expand-btn {
+            background: rgba(220,38,38,0.15);
+            border: 1px solid #dc2626;
+            color: #dc2626;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .expand-btn:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        /* Chart Fullscreen Modal */
+        .chart-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            backdrop-filter: blur(8px);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+        }
+        .chart-modal.active { display: flex; }
+        .chart-modal-inner {
+            background: #111827;
+            border: 2px solid #dc2626;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90vw;
+            max-width: 1000px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 60px rgba(220,38,38,0.3);
+        }
+        .chart-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        .chart-modal-close {
+            background: #dc2626;
+            border: none;
+            color: white;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chart-modal-body {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+        .chart-modal-body canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Layer toggle status indicators */
+        .layer-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        
+        .status-active {
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        
+        .status-inactive {
+            background-color: #6b7280;
+        }
+
+        .leaflet-popup-content {
+    font-size: 12px;
+    line-height: 1.3;
+    margin: 6px 8px;
+}
+
+.leaflet-popup-content-wrapper {
+    padding: 6px;
+}
+
+.leaflet-popup-tip {
+    width: 10px;
+    height: 6px;
+}
+
+#lulcLegend {
+    margin-top: 10px;
+}
+    </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="sidebar">
-    <h2>Borehole Stats</h2>
-    <input type="text" id="searchBar" placeholder="Search by site name..." />
-    <button id="clearSearch">Clear Search</button>
-    <select id="districtSelector">
-      <option value="">-- Zoom to District/Region --</option>
-      <optgroup label="Northern Region">
-    <option value="Chitipa">Chitipa</option>
-    <option value="Karonga">Karonga</option>
-    <option value="Likoma">Likoma</option>
-    <option value="Mzimba">Mzimba</option>
-    <option value="Nkhata Bay">Nkhata Bay</option>
-    <option value="Rumphi">Rumphi</option>
-</optgroup>
 
-<optgroup label="Central Region">
-    <option value="Dedza">Dedza</option>
-    <option value="Dowa">Dowa</option>
-    <option value="Kasungu">Kasungu</option>
-    <option value="Lilongwe">Lilongwe</option>
-    <option value="Mchinji">Mchinji</option>
-    <option value="Nkhotakota">Nkhotakota</option>
-    <option value="Ntcheu">Ntcheu</option>
-    <option value="Ntchisi">Ntchisi</option>
-    <option value="Salima">Salima</option>
-</optgroup>
-
-<optgroup label="Southern Region">
-    <option value="Balaka">Balaka</option>
-    <option value="Blantyre">Blantyre</option>
-    <option value="Chikwawa">Chikwawa</option>
-    <option value="Chiradzulu">Chiradzulu</option>
-    <option value="Machinga">Machinga</option>
-    <option value="Mangochi">Mangochi</option>
-    <option value="Mulanje">Mulanje</option>
-    <option value="Mwanza">Mwanza</option>
-    <option value="Neno">Neno</option>
-    <option value="Nsanje">Nsanje</option>
-    <option value="Phalombe">Phalombe</option>
-    <option value="Thyolo">Thyolo</option>
-    <option value="Zomba">Zomba</option>
-</optgroup>
-
-    </select>
-    <p>Total Boreholes: <span id="total-count">Loading...</span></p>
-    <button id="exportBtn">Export to CSV</button>
-    <button id="toggleHeatmap">Toggle Heatmap</button>
-    <canvas id="districtChart"></canvas>
-    <div id="submergence">
-      <h3>Potential Land Submergence</h3>
-      <p>Areas with high borehole density may be at risk of subsidence. Consider monitoring <strong>Dowa</strong> and <strong>Lilongwe</strong>.</p>
+<!-- Chart Expand Modal -->
+<div id="chartExpandModal" class="chart-modal">
+    <div class="chart-modal-inner">
+        <div class="chart-modal-header">
+            <span id="chartModalTitle"><i class="fas fa-chart-bar" style="color:#dc2626;margin-right:8px;"></i> Chart</span>
+            <button class="chart-modal-close" onclick="closeExpandModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="chart-modal-body">
+            <canvas id="expandedChartCanvas"></canvas>
+        </div>
     </div>
-  </div>
+</div>
 
-  <script>
-    const boreholeData = [
-      { site: "Matchado", lat: -13.777465, lon: 34.25583, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Ndalama", lat: -13.746785, lon: 34.2615, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mzalakoma Peg B", lat: -13.706707, lon: 34.256605, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mkwenembele", lat: -13.724208, lon: 34.246991, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Damba", lat: -13.673656, lon: 34.054441, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chimeza", lat: -13.70924, lon: 34.196643, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kamzati", lat: -13.746928, lon: 34.100455, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Gutsu", lat: -13.757715, lon: 34.113475, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chiwere", lat: -13.776423, lon: 34.129138, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kapazira", lat: -13.792633, lon: 34.126065, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kukhola", lat: -13.792089, lon: 34.161394, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kachikhada", lat: -13.696616, lon: 34.143762, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Msasata", lat: -13.659005, lon: 34.137875, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mwambula 1", lat: -13.74501, lon: 34.266977, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kautsagule", lat: -13.666743, lon: 34.045242, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mkomachi", lat: -13.76052, lon: 34.096627, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Yosiya", lat: -13.692395, lon: 34.08921, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Makalani", lat: -13.610816, lon: 34.08077, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kachidowo", lat: -13.602715, lon: 34.10109, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chimongo 3", lat: -13.614132, lon: 34.098172, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kambwiri", lat: -13.777243, lon: 34.275284, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Nyemba", lat: -13.713147, lon: 34.080853, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mnyalira", lat: -13.665542, lon: 34.122045, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mtakataka", lat: -13.6432, lon: 34.057067, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Mankwazi", lat: -13.594205, lon: 34.104974, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chapedya", lat: -13.638955, lon: 34.060568, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chinseu", lat: -13.635537, lon: 34.074735, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chitawa", lat: -13.632185, lon: 34.085183, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Sambo", lat: -13.6461504, lon: 34.089825, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Nyanda", lat: -13.6869573, lon: 34.081028, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Chimpala", lat: -13.678108, lon: 34.036118, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Kawangwi/Kasese", lat: -13.765063, lon: 34.243355, district: "Dowa", driller: "Blue Water Drilling LTD", owner: "Self Help Africa-SHA" },
-      { site: "Malembo TC &CDSS BH A", lat: -13.616815, lon: 33.41633, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Malembo TC &CDSS BH B", lat: -13.62276, lon: 33.4156, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Madziamanga", lat: -13.880558, lon: 33.47105, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Nyanga BH A", lat: -13.839557, lon: 33.371203, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Nyanga BH B", lat: -13.840542, lon: 33.372452, district: "Lilongwe", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Magomero BH A", lat: -14.383181, lon: 33.867459, district: "Dedza", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Magomero BH B", lat: -14.371758, lon: 33.871044, district: "Dedza", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Kakhuta BH A", lat: -14.823125, lon: 34.624165, district: "Ntcheu", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-      { site: "Kakhuta BH B", lat: -14.823792, lon: 34.624333, district: "Ntcheu", driller: "Ministry of Water and Sanitation", owner: "Ministry of Water and Sanitation" },
-       { site: "Kankhomba", lat: -12.8484, lon: 34.1389, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Mkombezi", lat: -12.8368, lon: 34.1271, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Lundu", lat: -12.8496, lon: 34.1183, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Katutula", lat: -12.8586, lon: 34.1352, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Kapoka", lat: -12.8468, lon: 34.1459, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Kalopa", lat: -12.8595, lon: 34.1466, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Kampoyo", lat: -12.8445, lon: 34.1318, district: "Chitipa", driller: "Conforzi Plantations", owner: "Conforzi Plantations" },
-{ site: "Misuku", lat: -9.7998, lon: 33.5684, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kameme", lat: -9.7513, lon: 33.6504, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwanjabala", lat: -9.7864, lon: 33.5714, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kalenge", lat: -9.7528, lon: 33.6203, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kapenda", lat: -9.8014, lon: 33.5963, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mabuka", lat: -9.7931, lon: 33.6021, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kapere", lat: -9.7482, lon: 33.6128, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Chisenga", lat: -9.7733, lon: 33.6025, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Chitipa Boma", lat: -9.7022, lon: 33.6077, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mbilima", lat: -9.6824, lon: 33.5982, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Ishalikira", lat: -9.7558, lon: 33.5839, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Lufita", lat: -9.7921, lon: 33.5792, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwanjawala", lat: -9.8074, lon: 33.5901, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kaseghe", lat: -9.7693, lon: 33.5699, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kalenge II", lat: -9.7442, lon: 33.6053, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kameme II", lat: -9.7412, lon: 33.6473, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Nthalire", lat: -10.0491, lon: 33.7197, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Ngana", lat: -9.8125, lon: 33.6632, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Buluma", lat: -9.8164, lon: 33.5775, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kalowa", lat: -9.7467, lon: 33.6033, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kameme B", lat: -9.7439, lon: 33.6515, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kapere II", lat: -9.7495, lon: 33.6113, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwakabanga", lat: -9.7891, lon: 33.5887, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwalweni", lat: -9.7659, lon: 33.6104, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Misuku North", lat: -9.7986, lon: 33.5618, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Ishalikira II", lat: -9.7532, lon: 33.5846, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kalanga", lat: -9.7884, lon: 33.5834, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Ntonda", lat: -9.8018, lon: 33.5899, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwanjawala II", lat: -9.8061, lon: 33.5915, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Buluma II", lat: -9.8145, lon: 33.5794, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kameme C", lat: -9.7428, lon: 33.6529, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Chitipa Rural", lat: -9.7523, lon: 33.6031, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Kalopa II", lat: -9.7583, lon: 33.6062, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mbalame", lat: -9.7814, lon: 33.5823, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Mwalweni II", lat: -9.7641, lon: 33.6117, district: "Chitipa", driller: "Chitipa DHO", owner: "Ministry of Health" },
-{ site: "Makuta 3", lat: -12.910352, lon: 34.28642, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Kaombe (Second attempt)", lat: -12.912433, lon: 34.295502, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Makuta 1 (Second attempt)", lat: -12.906315, lon: 34.291883, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chamndando (Second attempt)", lat: -12.917428, lon: 34.295653, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Phangwa (Second attempt)", lat: -12.920993, lon: 34.291291, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Makuta 2", lat: -12.906787, lon: 34.294896, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Vinthenga", lat: -12.893585, lon: 34.2972, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Njalachiuno", lat: -12.893599, lon: 34.170947, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Kapeta 1", lat: -12.889878, lon: 34.219859, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chinkhwangwa 1", lat: -12.713638, lon: 34.237072, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chisumba", lat: -12.814699, lon: 34.214001, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Jasi", lat: -12.837743, lon: 34.223918, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Kwambenga", lat: -12.861427, lon: 34.213035, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Kwabuwa", lat: -12.905432, lon: 34.213813, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chipaka", lat: -12.905207, lon: 34.213035, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Nkosi (Second Attempt)", lat: -12.861308, lon: 34.170947, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mtumbula 1", lat: -12.888632, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mtumbula 2", lat: -12.888632, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chanika", lat: -12.923529, lon: 34.272318, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Phangwa", lat: -12.921506, lon: 34.291506, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Sasani", lat: -13.001526, lon: 34.283377, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chunga", lat: -12.910959, lon: 34.326764, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chiutula 2", lat: -13.009764, lon: 34.291966, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chiutula", lat: -12.980806, lon: 34.20403, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Maliteni", lat: -13.033513, lon: 34.22621, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mamba (Second Atteipt)", lat: -13.12439, lon: 34.204237, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Makani Gunde", lat: -13.141912, lon: 34.24442, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Matola Mboya", lat: -13.123993, lon: 34.285755, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Rajab lemsoni", lat: -13.156612, lon: 34.292386, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mlamba", lat: -13.141087, lon: 34.196148, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chikwawe", lat: -13.153958, lon: 34.273389, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mussa Chalunda", lat: -13.157086, lon: 34.301956, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mkunva", lat: -13.148657, lon: 34.32736, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mchengeleza 2", lat: -13.197482, lon: 34.277794, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Chongole", lat: -13.130388, lon: 34.32963, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Jamali", lat: -12.916854, lon: 34.32841, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Shaban", lat: -13.122537, lon: 34.277773, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" },
-{ site: "Mphozela", lat: -13.131946, lon: 34.283377, district: "Nkhotakota", driller: "Blue Water Drilling LTD", owner: "Mai Aisha Trust-MAT" }
+<!-- Password Modal -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content">
+        <h3><i class="fas fa-lock" style="color: #dc2626;"></i> Secure Download</h3>
+        <input type="password" id="downloadPassword" placeholder="Enter password">
+        <div class="modal-buttons">
+            <button class="btn" onclick="verifyPassword()"><i class="fas fa-check"></i> Confirm</button>
+            <button class="btn btn-secondary" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+        </div>
+    </div>
+</div>
 
-    ];
+<!-- Top Bar -->
+<div class="topbar">
+    <img class="logo" src="https://hamza-nkhumbwa.github.io/galanwra/wwjdlogo.png" alt="Alumenda Logo">
+    <div class="title">
+        <i class="fas fa-shield-alt" style="margin-right: 10px;"></i>
+        ALUMENDA SECURITY DASHBOARD
+    </div>
+    <div class="video-container">
+        <video class="top-video" autoplay muted loop>
+            <source src="https://hamza-nkhumbwa.github.io/datasets/earth.mp4" type="video/mp4">
+        </video>
+    </div>
+</div>
 
-    const baseLayers = {
-      "OSM": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM contributors' }),
-      "Google Roadmap": L.tileLayer('http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Roadmap' }),
-      "Google Terrain": L.tileLayer('http://mt0.google.com/vt/lyrs=p&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Terrain' }),
-      "Google Satellite": L.tileLayer('http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Satellite' }),
-      "Google Hybrid": L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Hybrid' }),
-      "Altered Roadmap": L.tileLayer('http://mt0.google.com/vt/lyrs=r&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Altered Roadmap' }),
-      "Terrain Only": L.tileLayer('http://mt0.google.com/vt/lyrs=t&hl=en&x={x}&y={y}&z={z}', { attribution: 'Google Terrain Only' })
+<!-- Main Container -->
+<div id="container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="tabs-container">
+            <div class="tab active" data-tab="fields"><i class="fas fa-map-marked-alt"></i> Fields</div>
+            <div class="tab" data-tab="activity"><i class="fas fa-exclamation-triangle"></i> Activity</div>
+            <div class="tab" data-tab="villages"><i class="fas fa-home"></i> Villages</div>
+            <div class="tab" data-tab="transition"><i class="fas fa-chart-line"></i> Transition</div>
+            <div class="tab" data-tab="lulc"><i class="fas fa-layer-group"></i> LULC</div>
+            <div class="tab" data-tab="dams"><i class="fas fa-water"></i> Dams</div>
+            <div class="tab" data-tab="buffer"><i class="fas fa-draw-polygon"></i> Buffer</div>
+            <div class="tab" data-tab="hotspot"><i class="fas fa-fire"></i> Hotspot</div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content-container">
+            <!-- Fields Tab -->
+            <div class="tabContent active-content" id="fieldscontent">
+                <div class="section-header">
+                    <i class="fas fa-map-marked-alt"></i> Fields Management
+                </div>
+                
+                <div class="control-group">
+                    <label><i class="fas fa-tractor"></i> Select Farm(s)</label>
+                    <select id="farmSelect" class="form-select" multiple size="4">
+                        <option value="61">🏭 Farm 61</option>
+                        <option value="62">🏭 Farm 62</option>
+                        <option value="71">🏭 Farm 71</option>
+                        <option value="72">🏭 Farm 72</option>
+                    </select>
+                    
+                    <div style="display: flex; gap: 10px; margin: 12px 0;">
+                        <button class="btn btn-sm btn-warning" onclick="selectAllFarms()">
+                            <i class="fas fa-check-double"></i> Select All
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="clearAllFarms()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+
+                    <div class="selection-status">
+                        <i class="fas fa-eye" style="color: #dc2626; margin-right: 5px;"></i>
+                        Selected farms appear instantly on the map
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Fields</div>
+                            <div class="stat-value" id="totalFields">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Visible</div>
+                            <div class="stat-value" id="visibleFields">0</div>
+                        </div>
+                    </div>
+
+                    <button class="btn" onclick="downloadSelectedFarms()" style="width: 100%;">
+                        <i class="fas fa-download"></i> Download Selected Farms
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-info-circle"></i> Instructions</label>
+                    <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
+                        • Select farms using the dropdown above<br>
+                        • Fields appear immediately on the map<br>
+                        • Click any field to view ID and Area<br>
+                        • Hover for highlight effect<br>
+                        • Use Ctrl/Cmd to select multiple farms
+                    </p>
+                </div>
+            </div>
+
+            <!-- Activity Tab - FIXED WITH HEATMAP -->
+            <div class="tabContent" id="activitycontent">
+                <div class="section-header">
+                    <i class="fas fa-exclamation-triangle"></i> Activity Monitoring
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-filter"></i> Activity Type</label>
+                    <select id="activitySelect" class="form-select" multiple size="5">
+                        <option value="Intruders">🚨 Intruders</option>
+                        <option value="Fish-Mongers">🎣 Fish-Mongers</option>
+                        <option value="Fuel Mongers">⛽ Fuel Mongers</option>
+                        <option value="Sweepers">🧹 Sweepers</option>
+                        <option value="Others">📌 Others</option>
+                    </select>
+
+                    <div style="display: flex; gap: 10px; margin: 12px 0;">
+                        <button class="btn btn-sm btn-warning" onclick="selectAllActivities()">
+                            <i class="fas fa-check-double"></i> All
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="clearAllActivities()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Incidents</div>
+                            <div class="stat-value" id="totalIncidents">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Visible</div>
+                            <div class="stat-value" id="visibleIncidents">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Heatmap Toggle with Status -->
+                <div class="control-group">
+                    <label><i class="fas fa-fire"></i> Intrusion Heatmap</label>
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <span id="heatmapStatus" class="layer-status status-inactive"></span>
+                        <span id="heatmapStatusText" style="color: #94a3b8; font-size: 12px;">Currently Off</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap;">
+                        <button class="btn btn-sm" onclick="toggleHeatmap('Intruders')">
+                            <i class="fas fa-map"></i> Show Intruder Heatmap
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleHeatmap('all')">
+                            <i class="fas fa-globe"></i> All Activities
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="toggleHeatmap('off')">
+                            <i class="fas fa-power-off"></i> Hide Heatmap
+                        </button>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i> Heatmap shows concentration of activities. Red = high intensity, Blue = low intensity.
+                    </p>
+                </div>
+
+                <!-- UPDATED PIE CHART WITH MONTH SELECTOR -->
+                <div class="chart-container" style="position:relative;">
+                    <div class="chart-title" style="justify-content:space-between;">
+                        <span><i class="fas fa-chart-pie" style="color: #dc2626;"></i>
+                        Activity Distribution (by Frequency)</span>
+                        <button class="expand-btn" onclick="expandChart('activityPieChart','Activity Distribution')" title="Expand"><i class="fas fa-expand-alt"></i></button>
+                    </div>
+                    <div class="month-selector">
+                        <label for="monthSelect">Select Month:</label>
+                        <select id="monthSelect" class="form-select" style="width: 150px;">
+                            <option value="">Loading months...</option>
+                        </select>
+                    </div>
+                    <div class="chart-wrap"><canvas id="activityPieChart"></canvas></div>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-chart-bar"></i> Chart Type</label>
+                    <select id="chartTypeSelect" class="form-select" onchange="updateActivityChart()">
+                        <option value="bar">📊 Bar Chart</option>
+                        <option value="line">📈 Line Chart</option>
+                        <option value="scatter">🔵 Scatter Plot</option>
+                    </select>
+                </div>
+
+                <!-- UPDATED BAR CHART WITH NEW DATA SOURCE -->
+                <div class="chart-container" style="position:relative;">
+                    <div class="chart-title" style="justify-content:space-between;">
+                        <span><i class="fas fa-chart-bar" style="color: #dc2626;"></i>
+                        Field vs Average Headcount(YTD)</span>
+                        <button class="expand-btn" onclick="expandChart('activityBarChart','Field vs Average Frequency')" title="Expand"><i class="fas fa-expand-alt"></i></button>
+                    </div>
+                    <div class="chart-wrap"><canvas id="activityBarChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Villages Tab -->
+            <div class="tabContent" id="villagescontent">
+                <div class="section-header">
+                    <i class="fas fa-home"></i> Villages
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-map-pin"></i> Select Village</label>
+                    <select id="villageSelect" class="form-select">
+                        <option value="">-- Choose Village --</option>
+                    </select>
+
+                    <div style="display: flex; align-items: center; margin: 10px 0;">
+                        <span id="villagesStatus" class="layer-status status-inactive"></span>
+                        <span id="villagesStatusText" style="color: #94a3b8; font-size: 12px;">Villages Layer Off</span>
+                    </div>
+
+                    <button class="btn" onclick="toggleVillages()" style="width: 100%; margin-top: 5px;">
+                        <i class="fas fa-toggle-off"></i> <span id="villagesBtnText">Show Villages</span>
+                    </button>
+
+                    <button class="btn" onclick="zoomToVillage()" style="width: 100%; margin-top: 15px;">
+                        <i class="fas fa-search-location"></i> Zoom to Village
+                    </button>
+
+                    <div class="stats-grid" style="margin-top: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Villages</div>
+                            <div class="stat-value" id="totalVillages">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+            <!-- Transition Tab -->
+            <div class="tabContent" id="transitioncontent">
+                <div class="section-header">
+                    <i class="fas fa-chart-line"></i> Transition Analysis
+                </div>
+
+                <div class="control-group">
+                    <p style="color:#94a3b8; font-size:13px; line-height:1.6;">
+                        A detailed transition analytics dashboard is available on a separate page.
+                    </p>
+
+                    <a href="https://hamza-nkhumbwa.github.io/galanwra/Transiton.html"
+                       target="_blank"
+                       class="btn"
+                       style="width:100%; margin-top:10px;">
+                       <i class="fas fa-external-link-alt"></i>
+                       Open Full Transition Dashboard
+                    </a>
+                </div>
+
+                <!-- Hidden canvases kept so existing JavaScript does not break -->
+                <div style="display:none;">
+                    <div class="chart-wrap-tall"><canvas id="transitionChart"></canvas></div>
+                    <div class="chart-wrap-sm"><canvas id="transNetChart"></canvas></div>
+                </div>
+            </div>
+
+
+            <!-- LULC Tab -->
+            <div class="tabContent" id="lulccontent">
+                <div class="section-header">
+                    <i class="fas fa-layer-group"></i> LULC Maps
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-calendar"></i> Select Year</label>
+                    <div class="checkbox-group">
+    <div class="checkbox-item">
+        <input type="checkbox" id="lulc2005"> <label>2005</label>
+    </div>
+    <div class="checkbox-item">
+        <input type="checkbox" id="lulc2015"> <label>2015</label>
+    </div>
+    <div class="checkbox-item">
+        <input type="checkbox" id="lulc2025"> <label>2025</label>
+    </div>
+</div>
+
+<!-- ✅ LULC Legend  -->
+<div class="legend" id="lulcLegend">
+    <h4><i class="fas fa-palette"></i> LULC Classes</h4>
+    <div class="legend-item"><span class="legend-color" style="background:#3264d6;"></span> Water</div>
+    <div class="legend-item"><span class="legend-color" style="background:#98ff00;"></span> Sugarcane</div>
+    <div class="legend-item"><span class="legend-color" style="background:#fd7912;"></span> Built-up</div>
+    <div class="legend-item"><span class="legend-color" style="background:#212020;"></span> Bare Land</div>
+    <div class="legend-item"><span class="legend-color" style="background:#8c8e8c;"></span> Roads</div>
+    <div class="legend-item"><span class="legend-color" style="background:#3af7ee;"></span> Wetland</div>
+    <div class="legend-item"><span class="legend-color" style="background:#7e5937;"></span> Forest</div>
+    <div class="legend-item"><span class="legend-color" style="background:#006600;"></span> Trees</div>
+    <div class="legend-item"><span class="legend-color" style="background:#eded51;"></span> Field Crop Production</div>
+</div>
+    
+
+
+                    <div class="slider-container">
+                        <label>Opacity: <span id="opacityValue">0.7</span></label>
+                        <input type="range" id="opacitySlider" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                    
+                    <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i> Check boxes to enable LULC layers
+                    </p>
+                </div>
+            </div>
+
+            <!-- Dams Tab -->
+            <div class="tabContent" id="damscontent">
+                <div class="section-header">
+                    <i class="fas fa-water"></i> Dams & Pumps
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-eye"></i> Layer Control</label>
+                    
+                    <div style="display: flex; align-items: center; margin: 10px 0;">
+                        <span id="damsStatus" class="layer-status status-inactive"></span>
+                        <span id="damsStatusText" style="color: #94a3b8; font-size: 12px;">Dams Layer Off</span>
+                    </div>
+
+                    <button class="btn" onclick="toggleDams()" style="width: 100%;">
+                        <i class="fas fa-toggle-off"></i> <span id="damsBtnText">Show Dams Layer</span>
+                    </button>
+
+                    <div class="stats-grid" style="margin-top: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Dams</div>
+                            <div class="stat-value" id="totalDams">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buffer Tab -->
+            <div class="tabContent" id="buffercontent">
+                <div class="section-header">
+                    <i class="fas fa-draw-polygon"></i> Buffer Analysis
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-ruler"></i> Buffer Radius</label>
+                    <select id="bufferSelect" class="form-select">
+                        <option value="">Select Distance</option>
+                        <option value="500">500 meters</option>
+                        <option value="1000">1000 meters</option>
+                        <option value="2000">2000meters</option>
+                    </select>
+
+                    <button class="btn" onclick="applyBuffer()" style="width: 100%; margin-top: 15px;">
+                        <i class="fas fa-play"></i> Apply Buffer
+                    </button>
+
+                    <button class="btn btn-secondary" onclick="clearBuffer()" style="width: 100%; margin-top: 10px;">
+                        <i class="fas fa-trash"></i> Clear Buffer
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <label><i class="fas fa-info-circle"></i> How to use</label>
+                    <p style="color: #94a3b8; font-size: 13px; line-height: 1.8;">
+                        1. Click on map to set center<br>
+                        2. Select buffer radius<br>
+                        3. Click Apply Buffer<br>
+                        4. Activities inside are counted
+                    </p>
+                </div>
+            </div>
+
+            <!-- Hotspot Tab -->
+            <div class="tabContent" id="hotspotcontent">
+                <div class="section-header">
+                    <i class="fas fa-fire"></i> Hotspot Fields
+                </div>
+
+                <div class="chart-container" style="position:relative;">
+                    <div class="chart-title" style="justify-content:space-between;">
+                        <span><i class="fas fa-chart-bar"></i> Fields vs Average Headcount(YTD)</span>
+                        <button class="expand-btn" onclick="expandChart('hotspotChart','Fields vs Incident Frequency')" title="Expand">
+                            <i class="fas fa-expand-alt"></i>
+                        </button>
+                    </div>
+                    <div id="hotspotLoading" style="color:#94a3b8;font-size:12px;text-align:center;padding:10px;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading data...
+                    </div>
+                    <div class="chart-wrap"><canvas id="hotspotChart"></canvas></div>
+                </div>
+
+                <div class="control-group">
+                    <div style="color:#10b981;font-size:12px;">
+                        <i class="fas fa-check-circle"></i> Data auto-loaded from server
+                    </div>
+                    <p style="color:#94a3b8;font-size:12px;margin-top:8px;">
+                        Source: Week.csv — Field incident frequency data
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+</div>
+
+
+
+
+<!-- Heatmap Legend -->
+<div id="heatmapLegend" class="heatmap-legend" style="display: none;">
+    <h4 style="color: #dc2626; margin-bottom: 8px;"><i class="fas fa-fire"></i> Intrusion Intensity</h4>
+    <div class="heatmap-gradient"></div>
+    <div style="display: flex; justify-content: space-between;">
+        <span>Low</span>
+        <span>Medium</span>
+        <span>High</span>
+    </div>
+</div>
+
+<!-- Buffer Info -->
+<div id="bufferInfo" class="buffer-info" style="display: none;">
+    <i class="fas fa-map-marker-alt" style="color: #dc2626;"></i>
+    <span id="bufferDistance"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // ========== UTM Zone 36S Definition ==========
+    proj4.defs("EPSG:32736", "+proj=utm +zone=36 +south +datum=WGS84 +units=m +no_defs");
+
+    // ========== Map Initialization ==========
+    var map = L.map('map', {
+        center: [-16.386587, 34.893946],
+        zoom: 12,
+        zoomControl: true,
+        maxZoom: 20
+    });
+
+    // Create panes for layer ordering
+    map.createPane('basemapPane'); map.getPane('basemapPane').style.zIndex = 200;
+    map.createPane('lulcPane'); map.getPane('lulcPane').style.zIndex = 300;
+    map.createPane('fieldsPane'); map.getPane('fieldsPane').style.zIndex = 400;
+    map.createPane('activityPane'); map.getPane('activityPane').style.zIndex = 500;
+    map.createPane('villagesPane'); map.getPane('villagesPane').style.zIndex = 450;
+    map.createPane('damsPane'); map.getPane('damsPane').style.zIndex = 460;
+    map.createPane('bufferPane'); map.getPane('bufferPane').style.zIndex = 350;
+    map.createPane('heatmapPane'); map.getPane('heatmapPane').style.zIndex = 250;
+
+    // ========== Basemaps (Google Hybrid as default) ==========
+    var basemaps = {
+        googleHybrid: L.tileLayer('http://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            pane: 'basemapPane',
+            maxZoom: 20
+        }),
+        googleSat: L.tileLayer('http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        googleRoad: L.tileLayer('http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        googleTerrain: L.tileLayer('http://mt0.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', { pane: 'basemapPane' }),
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { pane: 'basemapPane' }),
+        cartoDark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { pane: 'basemapPane' })
     };
 
-    const map = L.map('map', {
-      center: [-13.9, 33.8],
-      zoom: 7,
-      layers: [baseLayers["OSM"]]
-    });
+    // Add default basemap (Google Hybrid)
+    basemaps.googleHybrid.addTo(map);
 
-    L.control.layers(baseLayers).addTo(map);
+    // Basemap control
+    L.control.layers(basemaps).addTo(map);
 
-    const markers = [];
-    const heatPoints = boreholeData.map(bh => [bh.lat, bh.lon, 0.5]);
-    const heat = L.heatLayer(heatPoints, {
-  radius: 25,         // Size of each heat point
-  blur: 15,           // How blurred the heat points appear
-  maxZoom: 12,        // Maximum zoom level where heatmap shows
-  gradient: {         // Color intensity scale
-    0.4: 'blue',      // Low density
-    0.6: 'lime',      // Medium density
-    0.9: 'red'        // High density
-  }
-}).addTo(map);        // Added to map by default
+    // Scale bar
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
+    // ========== Layer Groups (ALL OFF BY DEFAULT) ==========
+    var farmLayers = {};
+    var activityLayer = L.layerGroup(); // NOT added to map by default
+    var villagesLayer = L.layerGroup(); // NOT added to map by default
+    var damsLayer = L.layerGroup(); // NOT added to map by default
+    var bufferLayer = L.layerGroup();
+    var heatmapLayer = null;
 
+    // ========== LULC Layers (ALL OFF BY DEFAULT) ==========
+    var lulc2005 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/bc79a77a7f5ad3ea9eddf2e583589073-9504043b1817da770b5f11b3d510ae55/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
+    var lulc2015 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/dc191c4dd5c74646c729f082068f87c0-4a285c0b25040466678451465619c05a/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
+    var lulc2025 = L.tileLayer(
+        "https://earthengine.googleapis.com/v1/projects/ee-gis-021-20/maps/4f4b200fa2f5da6cdab0277a5a823391-277a3fc40fce4301a420fc388eaa6d3c/tiles/{z}/{x}/{y}",
+        { pane: 'lulcPane', opacity: 0.7 }
+    );
 
-
-
-
-    // Add heatmap layer
-var heatLayer = L.heatLayer(boreholeData, {
-  radius: 25,
-  blur: 15,
-  maxZoom: 17,
-}).addTo(map);
-
-
-// Toggle functionality
-document.getElementById('toggleHeatmap').addEventListener('click', () => {
-  map.hasLayer(heat) ? map.removeLayer(heat) : map.addLayer(heat);
-});
-    boreholeData.forEach(bh => {
-      const marker = L.marker([bh.lat, bh.lon])
-        .addTo(map)
-        .bindPopup(`<b>${bh.site}</b><br>District: ${bh.district}<br>Driller: ${bh.driller}<br>Owner: ${bh.owner}`);
-      markers.push({ marker, site: bh.site });
-    });
-
-    // Search functionality
-    const searchBar = document.getElementById('searchBar');
-    searchBar.addEventListener('input', () => {
-      const query = searchBar.value.toLowerCase();
-      markers.forEach(({ marker, site }) => {
-        marker.setOpacity(site.toLowerCase().includes(query) ? 1 : 0.2);
-      });
-    });
-
-    // Clear search
-    document.getElementById('clearSearch').addEventListener('click', () => {
-      searchBar.value = '';
-      markers.forEach(({ marker }) => marker.setOpacity(1));
-    });
-
-    // Zoom to district
-    document.getElementById('districtSelector').addEventListener('change', (e) => {
-      const district = e.target.value;
-      if (!district) return;
-      const districtBoreholes = boreholeData.filter(bh => bh.district === district);
-      if (districtBoreholes.length === 0) return;
-      const group = L.featureGroup(districtBoreholes.map(bh => L.marker([bh.lat, bh.lon])));
-      map.fitBounds(group.getBounds(), { padding: [50, 50] });
-    });
-
-    // Toggle heatmap
-    let heatmapVisible = true;
-    document.getElementById('toggleHeatmap').addEventListener('click', () => {
-      heatmapVisible = !heatmapVisible;
-      heatmapVisible ? heat.addTo(map) : map.removeLayer(heat);
-    });
-
-    // CSV export with timestamp
-    function convertToCSV(data) {
-      const headers = Object.keys(data[0]).join(',');
-      const rows = data.map(obj => 
-        Object.values(obj).map(value => 
-          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-        ).join(',')
-      );
-      return [headers, ...rows].join('\n');
-    }
-
-    function downloadCSV() {
-      const csv = convertToCSV(boreholeData);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `borehole_data_${timestamp}.csv`;
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.setAttribute('href', URL.createObjectURL(blob));
-      link.setAttribute('download', filename);
-      link.click();
-    }
-
-    document.getElementById('exportBtn').addEventListener('click', downloadCSV);
-
-    // Chart
-    const districtCounts = boreholeData.reduce((acc, { district }) => {
-      acc[district] = (acc[district] || 0) + 1;
-      return acc;
-    }, {});
-
-    new Chart(document.getElementById('districtChart'), {
-      type: 'bar',
-      data: {
-        labels: Object.keys(districtCounts),
-        datasets: [{
-          label: 'Boreholes by District',
-          data: Object.values(districtCounts),
-          backgroundColor: '#28a745'
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: { 
-            display: true, 
-            text: 'Spatial Yield of Groundwater (via Borehole Count)'
-          }
+    // LULC toggles - ONLY ADD WHEN CHECKED
+    document.getElementById("lulc2005").addEventListener('change', function(e) {
+        if (e.target.checked) {
+            lulc2005.addTo(map);
+        } else {
+            map.removeLayer(lulc2005);
         }
-      }
+    });
+    
+    document.getElementById("lulc2015").addEventListener('change', function(e) {
+        if (e.target.checked) {
+            lulc2015.addTo(map);
+        } else {
+            map.removeLayer(lulc2015);
+        }
+    });
+    
+    document.getElementById("lulc2025").addEventListener('change', function(e) {
+        if (e.target.checked) {
+            lulc2025.addTo(map);
+        } else {
+            map.removeLayer(lulc2025);
+        }
     });
 
-    document.getElementById('total-count').textContent = boreholeData.length;
+    // Opacity control
+    document.getElementById("opacitySlider").addEventListener('input', function(e) {
+        var opacity = e.target.value;
+        document.getElementById("opacityValue").textContent = opacity;
+        [lulc2005, lulc2015, lulc2025].forEach(l => l.setOpacity(opacity));
+    });
 
+    // ========== Tab System ==========
+    var transitionLoaded = false;
+    document.querySelectorAll(".tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".tabContent").forEach(c => c.classList.remove("active-content"));
+            
+            tab.classList.add("active");
+            document.getElementById(tab.dataset.tab + "content").classList.add("active-content");
 
-  </script>
+            // Resize all charts so they fill their containers after tab is visible
+            setTimeout(() => {
+                Chart.instances && Object.values(Chart.instances).forEach(c => { try { c.resize(); } catch(e){} });
+                if (window.transitionChart) window.transitionChart.resize();
+                if (window.transNetChart) window.transNetChart.resize();
+            }, 50);
+        });
+    });
+
+    // ========== UTM Conversion Helper ==========
+    function utmToLatLng(easting, northing) {
+        try {
+            // Parse as floats and validate
+            var east = parseFloat(easting);
+            var north = parseFloat(northing);
+            
+            if (isNaN(east) || isNaN(north)) {
+                console.error('Invalid UTM coordinates:', easting, northing);
+                return null;
+            }
+            
+            var result = proj4("EPSG:32736", "EPSG:4326", [east, north]);
+            return { lat: result[1], lng: result[0] };
+        } catch(e) {
+            console.error('UTM conversion error:', e);
+            return null;
+        }
+    }
+
+    // ========== FIELDS LAYER - Instant display on selection ==========
+    var fieldCounts = { '61': 0, '62': 0, '71': 0, '72': 0 };
+    var totalFields = 0;
+
+    function loadFarm(farmId) {
+        fieldCounts[farmId] = 0; // Reset count for this farm before loading
+        fetch(`https://hamza-nkhumbwa.github.io/galanwra/Farm${farmId}.geojson`)
+            .then(r => r.json())
+            .then(data => {
+                var layer = L.geoJSON(data, {
+                    style: { 
+                        fillColor: getFarmColor(farmId),
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.6
+                    },
+                    onEachFeature: (feature, layer) => {
+                        fieldCounts[farmId]++;
+                        totalFields++;
+                        document.getElementById('totalFields').textContent = totalFields;
+                        
+                        if (feature.properties) {
+                            layer.bindPopup(`
+                                <div style="padding: 10px;">
+                                    <h4 style="color: #dc2626; margin-bottom: 8px;">Field Details</h4>
+                                    <p><b>ID:</b> ${feature.properties.ID || feature.properties.Id || feature.properties.id || feature.properties.FIELD_ID || feature.properties.Field || 'N/A'}</p>
+                                    <p><b>Area (ha):</b> ${feature.properties['Area (ha)'] || feature.properties['AREA (HA)'] || feature.properties['Area(ha)'] || feature.properties['Area_ha'] || feature.properties['AREA_HA'] || feature.properties.Area || 'N/A'}</p>
+                                    <p><b>Farm:</b> ${farmId}</p>
+                                </div>
+                            `);
+                            
+                            layer.on('mouseover', function() {
+                                this.setStyle({ weight: 4, fillOpacity: 0.8 });
+                            });
+                            layer.on('mouseout', function() {
+                                this.setStyle({ weight: 2, fillOpacity: 0.6 });
+                            });
+                        }
+                    }
+                }, { pane: 'fieldsPane' });
+                
+                farmLayers[farmId] = layer;
+                
+                // Auto-display if farm is selected in dropdown
+                var select = document.getElementById('farmSelect');
+                var selectedValues = Array.from(select.selectedOptions).map(opt => opt.value);
+                if (selectedValues.includes(farmId)) {
+                    layer.addTo(map);
+                }
+                
+                updateVisibleFields();
+            })
+            .catch(error => {
+                console.error(`Error loading Farm ${farmId}:`, error);
+                alert(`⚠️ Failed to load Farm ${farmId}. Check if Farm${farmId}.geojson exists and is correctly named.`);
+            });
+    }
+
+    function getFarmColor(farmId) {
+        return { '61': '#ef4444', '62': '#3b82f6', '71': '#10b981', '72': '#f59e0b' }[farmId] || '#94a3b8';
+    }
+
+    // Load all farms
+    ['61', '62', '71', '72'].forEach(loadFarm);
+
+    // Farm selection - INSTANT DISPLAY ON MAP
+    document.getElementById('farmSelect').addEventListener('change', function(e) {
+        var selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+        
+        // First, remove all farm layers from map
+        Object.keys(farmLayers).forEach(key => {
+            if (map.hasLayer(farmLayers[key])) {
+                map.removeLayer(farmLayers[key]);
+            }
+        });
+        
+        // Then add only selected farms - THEY APPEAR INSTANTLY ON MAP
+        selected.forEach(farmId => {
+            if (farmLayers[farmId]) {
+                farmLayers[farmId].addTo(map);
+            }
+        });
+        
+        updateVisibleFields();
+        
+        // Optional: Zoom to show all selected farms
+        if (selected.length > 0) {
+            var bounds = L.latLngBounds([]);
+            selected.forEach(farmId => {
+                if (farmLayers[farmId]) {
+                    farmLayers[farmId].eachLayer(layer => {
+                        bounds.extend(layer.getBounds());
+                    });
+                }
+            });
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    });
+
+    function updateVisibleFields() {
+        var visible = 0;
+        Object.keys(farmLayers).forEach(key => {
+            if (map.hasLayer(farmLayers[key])) {
+                farmLayers[key].eachLayer(() => visible++);
+            }
+        });
+        document.getElementById('visibleFields').textContent = visible;
+    }
+
+    function selectAllFarms() {
+        var select = document.getElementById('farmSelect');
+        Array.from(select.options).forEach(o => o.selected = true);
+        select.dispatchEvent(new Event('change'));
+    }
+
+    function clearAllFarms() {
+        var select = document.getElementById('farmSelect');
+        Array.from(select.options).forEach(o => o.selected = false);
+        select.dispatchEvent(new Event('change'));
+    }
+
+    // ========== Password Download ==========
+    var modal = document.getElementById('passwordModal');
+    var currentDownload = null;
+
+    function downloadSelectedFarms() {
+        var selected = Array.from(document.getElementById('farmSelect').selectedOptions).map(opt => opt.value);
+        if (selected.length === 0) { alert('Select farms first'); return; }
+        currentDownload = selected;
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        modal.classList.remove('active');
+        document.getElementById('downloadPassword').value = '';
+    }
+
+    function verifyPassword() {
+        if (document.getElementById('downloadPassword').value === 'WWJD2026') {
+            downloadFarms(currentDownload);
+            closeModal();
+        } else { alert('❌ Incorrect password'); }
+    }
+
+    function downloadFarms(farmIds) {
+        farmIds.forEach(id => {
+            fetch(`https://hamza-nkhumbwa.github.io/galanwra/Farm${id}.geojson`)
+                .then(r => r.json())
+                .then(data => {
+                    var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `Farm${id}.geojson`;
+                    a.click();
+                });
+        });
+    }
+
+    // ========== FIXED: Activity Data from Activity.csv ==========
+    var activityData = [];
+    var activityMarkers = [];
+    var heatmapPoints = [];
+
+    function loadActivityData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Activity.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                console.log('Activity CSV loaded:', results.data.length, 'rows');
+                activityData = results.data;
+                displayActivities(activityData);
+                document.getElementById('totalIncidents').textContent = activityData.length;
+            },
+            error: function(error) {
+                console.error('Error loading Activity.csv:', error);
+                alert('Error loading activity data. Please check the console.');
+            }
+        });
+    }
+
+    function displayActivities(data) {
+        activityLayer.clearLayers();
+        activityMarkers = [];
+        heatmapPoints = [];
+        
+        data.forEach(row => {
+            if (row.Eastings && row.Northings) {
+                // FIX 1: Convert UTM to Lat/Lng
+                var latlng = utmToLatLng(row.Eastings, row.Northings);
+                if (latlng) {
+                    // FIX 2: Use correct column names
+                    var activity = row.Activity || 'Unknown';
+                    var cropFeature = row['Crop-Feature'] || row['Crop/Feature'] || row.Crop_Feature || 'N/A';
+                    var cropAge = row['Age-Crop'] || row['Crop Age'] || row.Crop_Age || 'N/A';
+                    
+                    var marker = L.circleMarker([latlng.lat, latlng.lng], {
+                        radius: 7,
+                        fillColor: getActivityColor(activity),
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.9,
+                        pane: 'activityPane'
+                    });
+                    
+                    // FIX: Detailed popup with all columns
+                    marker.bindPopup(`
+                        <div style="padding: 12px; max-width: 300px;">
+                            <h4 style="color: #dc2626; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px;">Activity Details</h4>
+                            <div style="line-height: 1.8;">
+                                <p><b>Farm:</b> ${row.Farm || 'N/A'}</p>
+                                <p><b>Field:</b> ${row.Field || 'N/A'}</p>
+                                <p><b>Eastings:</b> ${row.Eastings || 'N/A'}</p>
+                                <p><b>Northings:</b> ${row.Northings || 'N/A'}</p>
+                                <p><b>Crop/Feature:</b> ${cropFeature}</p>
+                                <p><b>Crop Age:</b> ${cropAge}</p>
+                                <p><b>Activity:</b> ${activity}</p>
+                                <p><b>Date:</b> ${row.Date || 'N/A'}</p>
+                                <p><b>Time:</b> ${row.Time || 'N/A'}</p>
+                                <p><b>Day/Night:</b> ${row['Day/Night'] || 'N/A'}</p>
+                                <p><b>Average Headcount(YTD):</b> ${row.Frequency || 'N/A'}</p>
+                                <p><b>Rate:</b> ${row.Rate || 'N/A'}</p>
+                            </div>
+                        </div>
+                    `);
+                    
+                    marker.on('mouseover', function() { this.setStyle({ radius: 9 }); });
+                    marker.on('mouseout', function() { this.setStyle({ radius: 7 }); });
+                    
+                    marker.addTo(activityLayer);
+                    activityMarkers.push(marker);
+                    
+                    // Add to heatmap points (with frequency as intensity)
+                    var intensity = parseFloat(row.Frequency) || 1;
+                    heatmapPoints.push([latlng.lat, latlng.lng, intensity]);
+                }
+            }
+        });
+        
+        console.log('Displayed', activityMarkers.length, 'activity markers');
+        updateVisibleCount();
+        
+        // NOTE: activityLayer is NOT added to map by default
+        // User must select activities to see them
+    }
+
+    function getActivityColor(activity) {
+        // FIX 3: Match activity names exactly
+        var activityMap = {
+            'Intruders': '#ef4444',
+            'Fish-Mongers': '#10b981',
+            'Fuel Mongers': '#3b82f6',
+            'Sweepers': '#f59e0b',
+            'Others': '#8b5cf6'
+        };
+        
+        // Try to match regardless of case or extra spaces
+        var normalizedActivity = String(activity).trim();
+        for (var key in activityMap) {
+            if (normalizedActivity.toLowerCase().includes(key.toLowerCase())) {
+                return activityMap[key];
+            }
+        }
+        
+        return '#94a3b8'; // Default gray
+    }
+
+    // ========== NEW: Heatmap Functionality ==========
+    function toggleHeatmap(type) {
+        // Remove existing heatmap if any
+        if (heatmapLayer) {
+            map.removeLayer(heatmapLayer);
+            heatmapLayer = null;
+        }
+        
+        // Hide legend initially
+        document.getElementById('heatmapLegend').style.display = 'none';
+        
+        // Update status indicators
+        var statusDot = document.getElementById('heatmapStatus');
+        var statusText = document.getElementById('heatmapStatusText');
+        
+        if (type === 'off') {
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Currently Off';
+            return; // Just hide heatmap
+        }
+        
+        // Filter points based on type
+        var points = [];
+        
+        if (type === 'all') {
+            points = heatmapPoints;
+            statusText.textContent = 'Showing: All Activities';
+        } else if (type === 'Intruders') {
+            // Filter for intruder activities only
+            points = [];
+            activityData.forEach((row, index) => {
+                if (row.Activity && row.Activity.toLowerCase().includes('intrud')) {
+                    var latlng = utmToLatLng(row.Eastings, row.Northings);
+                    if (latlng) {
+                        var intensity = parseFloat(row.Frequency) || 1;
+                        points.push([latlng.lat, latlng.lng, intensity]);
+                    }
+                }
+            });
+            statusText.textContent = 'Showing: Intruders Only';
+        }
+        
+        if (points.length === 0) {
+            alert('No activity points found for heatmap');
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'No data available';
+            return;
+        }
+        
+        // Create heatmap layer
+        heatmapLayer = L.heatLayer(points, {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            max: 1.0,
+            gradient: {
+                0.0: 'blue',
+                0.3: 'cyan',
+                0.5: 'lime',
+                0.7: 'yellow',
+                1.0: 'red'
+            },
+            pane: 'heatmapPane'
+        }).addTo(map);
+        
+        // Update status
+        statusDot.className = 'layer-status status-active';
+        
+        // Show legend
+        document.getElementById('heatmapLegend').style.display = 'block';
+        
+        // Optionally zoom to show all points
+        if (points.length > 0) {
+            var bounds = L.latLngBounds(points.map(p => [p[0], p[1]]));
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    }
+
+    // FIX 3: Update filter function to match activity names
+    function selectAllActivities() {
+        var select = document.getElementById('activitySelect');
+        Array.from(select.options).forEach(o => o.selected = true);
+        filterActivities();
+        
+        // Add activity layer to map if not already present
+        if (!map.hasLayer(activityLayer)) {
+            map.addLayer(activityLayer);
+        }
+    }
+
+    function clearAllActivities() {
+        var select = document.getElementById('activitySelect');
+        Array.from(select.options).forEach(o => o.selected = false);
+        filterActivities();
+        
+        // Remove activity layer from map if no activities selected
+        if (map.hasLayer(activityLayer)) {
+            map.removeLayer(activityLayer);
+        }
+    }
+
+    function filterActivities() {
+        var selected = Array.from(document.getElementById('activitySelect').selectedOptions).map(o => o.value);
+        
+        // If nothing selected, remove layer from map
+        if (selected.length === 0) {
+            if (map.hasLayer(activityLayer)) {
+                map.removeLayer(activityLayer);
+            }
+            updateVisibleCount();
+            return;
+        }
+        
+        // Add layer to map if not already present
+        if (!map.hasLayer(activityLayer)) {
+            map.addLayer(activityLayer);
+        }
+        
+        // Filter visible markers
+        activityLayer.eachLayer(layer => {
+            var popupContent = layer.getPopup().getContent();
+            var match = false;
+            
+            for (var i = 0; i < selected.length; i++) {
+                if (popupContent.includes(selected[i])) {
+                    match = true;
+                    break;
+                }
+            }
+            
+            if (!match) {
+                if (map.hasLayer(layer)) layer.remove();
+            } else {
+                if (!map.hasLayer(layer)) layer.addTo(activityLayer);
+            }
+        });
+        
+        updateVisibleCount();
+    }
+
+    function updateVisibleCount() {
+        var count = 0;
+        activityLayer.eachLayer(() => count++);
+        document.getElementById('visibleIncidents').textContent = count;
+    }
+
+    document.getElementById('activitySelect').addEventListener('change', filterActivities);
+
+    // ========== Villages Toggle ==========
+    function toggleVillages() {
+        var btn = document.getElementById('villagesBtnText');
+        var statusDot = document.getElementById('villagesStatus');
+        var statusText = document.getElementById('villagesStatusText');
+        
+        if (map.hasLayer(villagesLayer)) {
+            map.removeLayer(villagesLayer);
+            btn.innerHTML = 'Show Villages';
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Villages Layer Off';
+        } else {
+            map.addLayer(villagesLayer);
+            btn.innerHTML = 'Hide Villages';
+            statusDot.className = 'layer-status status-active';
+            statusText.textContent = 'Villages Layer On';
+        }
+    }
+
+    // ========== Dams Toggle ==========
+    function toggleDams() {
+        var btn = document.getElementById('damsBtnText');
+        var statusDot = document.getElementById('damsStatus');
+        var statusText = document.getElementById('damsStatusText');
+        
+        if (map.hasLayer(damsLayer)) {
+            map.removeLayer(damsLayer);
+            btn.innerHTML = 'Show Dams Layer';
+            statusDot.className = 'layer-status status-inactive';
+            statusText.textContent = 'Dams Layer Off';
+        } else {
+            map.addLayer(damsLayer);
+            btn.innerHTML = 'Hide Dams Layer';
+            statusDot.className = 'layer-status status-active';
+            statusText.textContent = 'Dams Layer On';
+        }
+    }
+
+    // ========== Monthly Pie Chart from PieChat.csv ==========
+    var activityPieChart;
+    var pieChartData = {};
+
+    function loadPieChartData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/PieChat.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                // Process data - group by month
+                var months = [...new Set(results.data.map(row => row.Month))].filter(Boolean);
+                
+                // Populate month selector
+                var monthSelect = document.getElementById('monthSelect');
+                monthSelect.innerHTML = '<option value="">Select Month</option>';
+                months.forEach(month => {
+                    var option = document.createElement('option');
+                    option.value = month;
+                    option.textContent = month;
+                    monthSelect.appendChild(option);
+                });
+                
+                // Store data by month
+                pieChartData = {};
+                results.data.forEach(row => {
+                    if (row.Month && row.Activity && row.AverageFrequency) {
+                        if (!pieChartData[row.Month]) {
+                            pieChartData[row.Month] = {};
+                        }
+                        pieChartData[row.Month][row.Activity] = parseFloat(row.AverageFrequency) || 0;
+                    }
+                });
+                
+                // Add event listener for month change
+                monthSelect.addEventListener('change', function(e) {
+                    updatePieChart(e.target.value);
+                });
+                
+                // Show first month by default if available
+                if (months.length > 0) {
+                    monthSelect.value = months[0];
+                    updatePieChart(months[0]);
+                }
+            },
+            error: function(error) {
+                console.error('Error loading PieChat.csv:', error);
+                document.getElementById('monthSelect').innerHTML = '<option value="">Error loading months</option>';
+            }
+        });
+    }
+
+    function updatePieChart(month) {
+        if (!month || !pieChartData[month]) {
+            return;
+        }
+        
+        var data = pieChartData[month];
+        var activities = Object.keys(data);
+        var frequencies = Object.values(data);
+        
+        var ctx = document.getElementById('activityPieChart').getContext('2d');
+        if (activityPieChart) activityPieChart.destroy();
+        
+        activityPieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: activities,
+                datasets: [{
+                    data: frequencies,
+                    backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        labels: { 
+                            color: '#fff', 
+                            font: { size: 11 } 
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `Activity Distribution - ${month}`,
+                        color: '#fff',
+                        font: { size: 14 }
+                    }
+                }
+            }
+        });
+    }
+
+    // ========== Bar Chart from Bargraph.csv ==========
+    var activityBarChart;
+
+    function loadBarChartData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Bargraph.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                var fields = [];
+                var frequencies = [];
+                
+                results.data.forEach(row => {
+                    if (row.Field && row.AverageFrequency) {
+                        fields.push(row.Field);
+                        frequencies.push(parseFloat(row.AverageFrequency) || 0);
+                    }
+                });
+                
+                var ctx = document.getElementById('activityBarChart').getContext('2d');
+                if (activityBarChart) activityBarChart.destroy();
+                
+                activityBarChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: fields,
+                        datasets: [{
+                            label: 'Average Headcount(YTD)',
+                            data: frequencies,
+                            backgroundColor: '#ef4444',
+                            borderColor: '#fff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                labels: { color: '#fff' } 
+                            } 
+                        },
+                        scales: {
+                            y: { 
+                                ticks: { color: '#fff' }, 
+                                grid: { color: '#334155' },
+                                beginAtZero: true
+                            },
+                            x: { 
+                                ticks: { color: '#fff', maxRotation: 45, minRotation: 45 },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            },
+            error: function(error) {
+                console.error('Error loading Bargraph.csv:', error);
+            }
+        });
+    }
+
+    function updateActivityChart() {
+        var type = document.getElementById('chartTypeSelect').value;
+        if (activityBarChart) {
+            activityBarChart.config.type = type;
+            activityBarChart.update();
+        }
+    }
+
+    // ========== Villages ==========
+    function loadVillages() {
+        fetch('https://hamza-nkhumbwa.github.io/galanwra/Alumendavillages.geojson')
+            .then(r => r.json())
+            .then(data => {
+                var select = document.getElementById('villageSelect');
+                var count = 0;
+                
+                L.geoJSON(data, {
+                    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+                        radius: 7,
+                        fillColor: '#f59e0b',
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 0.8,
+                        pane: 'villagesPane'
+                    }),
+                    onEachFeature: (f, layer) => {
+                        count++;
+                        var props = f.properties || {};
+                        layer.bindPopup(`
+                            <div style="padding: 8px;">
+                                <h4 style="color: #f59e0b;">Village Details</h4>
+                                <p><b>NAME:</b> ${props.NAME || 'N/A'}</p>
+                                <p><b>TA:</b> ${props.TANAME || 'N/A'}</p>
+                                <p><b>DISTRICT:</b> ${props.DISTRICT || 'N/A'}</p>
+                                <p><b>UTM EAST:</b> ${props.UTMEAST || 'N/A'}</p>
+                                <p><b>UTM NORTH:</b> ${props.UTMNORTH || 'N/A'}</p>
+                            </div>
+                        `);
+                        
+                        if (props.NAME) {
+                            var opt = document.createElement('option');
+                            opt.value = props.NAME;
+                            opt.textContent = props.NAME;
+                            select.appendChild(opt);
+                        }
+                        
+                        layer.addTo(villagesLayer);
+                    }
+                });
+                
+                document.getElementById('totalVillages').textContent = count;
+                
+                // Note: villagesLayer is NOT added to map by default
+            });
+    }
+
+    function zoomToVillage() {
+        var name = document.getElementById('villageSelect').value;
+        if (!name) { alert('Select a village'); return; }
+        
+        // Make sure villages layer is visible
+        if (!map.hasLayer(villagesLayer)) {
+            map.addLayer(villagesLayer);
+            document.getElementById('villagesBtnText').innerHTML = 'Hide Villages';
+            document.getElementById('villagesStatus').className = 'layer-status status-active';
+            document.getElementById('villagesStatusText').textContent = 'Villages Layer On';
+        }
+        
+        villagesLayer.eachLayer(layer => {
+            if (layer.getPopup().getContent().includes(name)) {
+                map.setView(layer.getLatLng(), 15);
+                layer.openPopup();
+            }
+        });
+    }
+
+    // ========== Transition Statistics ==========
+    var transitionRawData = null;
+    var currentTransType = 'bar';
+
+    var transitionColors = [
+        { bg: 'rgba(59,130,246,0.85)', border: '#3b82f6' },
+        { bg: 'rgba(16,185,129,0.85)', border: '#10b981' },
+        { bg: 'rgba(245,158,11,0.85)', border: '#f59e0b' },
+        { bg: 'rgba(239,68,68,0.85)', border: '#ef4444' },
+        { bg: 'rgba(168,85,247,0.85)', border: '#a855f7' },
+        { bg: 'rgba(236,72,153,0.85)', border: '#ec4899' },
+        { bg: 'rgba(14,165,233,0.85)', border: '#0ea5e9' },
+        { bg: 'rgba(132,204,22,0.85)', border: '#84cc16' },
+        { bg: 'rgba(251,146,60,0.85)', border: '#fb923c' }
+    ];
+
+    function loadTransitionData() {
+        document.getElementById('transLoading').style.display = 'block';
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/ALUMENDA.csv', {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                document.getElementById('transLoading').style.display = 'none';
+                transitionRawData = results.data;
+                renderTransitionChart('bar');
+            },
+            error: function() {
+                document.getElementById('transLoading').textContent = '⚠ Failed to load data';
+            }
+        });
+    }
+
+    function renderTransitionChart(type) {
+        if (!transitionRawData) return;
+        currentTransType = type;
+        var data = transitionRawData;
+
+        // Detect year columns (numeric column names)
+        var allKeys = Object.keys(data[0] || {});
+        var yearCols = allKeys.filter(k => /^\d{4}$/.test(k.trim())).sort();
+        var classKey = allKeys.find(k => /class/i.test(k)) || allKeys[0];
+
+        if (yearCols.length === 0) {
+            // Try first key as class, rest as years
+            yearCols = allKeys.slice(1);
+        }
+
+        var classes = data.map(r => (r[classKey] || '').trim()).filter(Boolean);
+
+        var ctx = document.getElementById('transitionChart').getContext('2d');
+        if (window.transitionChart) window.transitionChart.destroy();
+
+        var isRadar = type === 'radar';
+        var isGroupedBar = type === 'bar';
+
+        if (isRadar) {
+            // Radar: one dataset per year, labels = classes
+            var datasets = yearCols.map((y, i) => ({
+                label: y,
+                data: data.map(r => parseFloat(r[y]) || 0),
+                backgroundColor: transitionColors[i % transitionColors.length].bg.replace('0.85','0.25'),
+                borderColor: transitionColors[i % transitionColors.length].border,
+                borderWidth: 2,
+                pointBackgroundColor: transitionColors[i % transitionColors.length].border,
+                pointRadius: 4
+            }));
+            window.transitionChart = new Chart(ctx, {
+                type: 'radar',
+                data: { labels: classes, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#e2e8f0', font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.r.toLocaleString()} ha`
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            grid: { color: 'rgba(100,116,139,0.4)' },
+                            angleLines: { color: 'rgba(100,116,139,0.4)' },
+                            ticks: { color: '#94a3b8', backdropColor: 'transparent', font: { size: 10 } },
+                            pointLabels: { color: '#e2e8f0', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Bar or Line: labels = classes, dataset per year
+            var datasets = yearCols.map((y, i) => ({
+                label: y,
+                data: data.map(r => parseFloat(r[y]) || 0),
+                backgroundColor: transitionColors[i % transitionColors.length].bg,
+                borderColor: transitionColors[i % transitionColors.length].border,
+                borderWidth: 2,
+                borderRadius: isGroupedBar ? 6 : 0,
+                tension: 0.4,
+                fill: type === 'line' ? false : undefined,
+                pointRadius: type === 'line' ? 5 : 0,
+                pointHoverRadius: type === 'line' ? 8 : 0
+            }));
+            window.transitionChart = new Chart(ctx, {
+                type: type,
+                data: { labels: classes, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 800, easing: 'easeInOutQuart' },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e2e8f0', font: { size: 11 }, padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#94a3b8',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} ha`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: v => v.toLocaleString() + ' ha'
+                            },
+                            grid: { color: 'rgba(51,65,85,0.6)' },
+                            title: { display: true, text: 'Area (hectares)', color: '#64748b', font: { size: 11 } }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8', maxRotation: 35, font: { size: 10 } },
+                            grid: { color: 'rgba(51,65,85,0.3)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Net change chart (2025 - 2005)
+        if (yearCols.length >= 2 && document.getElementById('transNetChart')) {
+            var firstY = yearCols[0];
+            var lastY = yearCols[yearCols.length - 1];
+            var netChanges = data.map(r => (parseFloat(r[lastY]) || 0) - (parseFloat(r[firstY]) || 0));
+            var netColors = netChanges.map(v => v >= 0 ? 'rgba(16,185,129,0.8)' : 'rgba(239,68,68,0.8)');
+            var netBorders = netChanges.map(v => v >= 0 ? '#10b981' : '#ef4444');
+
+            var ctx2 = document.getElementById('transNetChart').getContext('2d');
+            if (window.transNetChart) window.transNetChart.destroy();
+            window.transNetChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: classes,
+                    datasets: [{
+                        label: `Net Change (${firstY}→${lastY})`,
+                        data: netChanges,
+                        backgroundColor: netColors,
+                        borderColor: netBorders,
+                        borderWidth: 2,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#e2e8f0', font: { size: 11 } } },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#94a3b8',
+                            callbacks: {
+                                label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toLocaleString()} ha`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#94a3b8', callback: v => v.toLocaleString() + ' ha' },
+                            grid: { color: 'rgba(51,65,85,0.6)' },
+                            title: { display: true, text: 'Net Change (ha)', color: '#64748b', font: { size: 11 } }
+                        },
+                        x: { ticks: { color: '#94a3b8', maxRotation: 35, font: { size: 10 } }, grid: { color: 'rgba(51,65,85,0.3)' } }
+                    }
+                }
+            });
+        }
+    }
+
+    function setTransChart(type) {
+        ['bar','line','radar'].forEach(t => {
+            var btn = document.getElementById('transBtn_' + t);
+            if (btn) {
+                btn.className = t === type ? 'btn btn-sm' : 'btn btn-sm btn-secondary';
+            }
+        });
+        renderTransitionChart(type);
+    }
+
+    // ========== Dams ==========
+    function loadDams() {
+        fetch('https://hamza-nkhumbwa.github.io/galanwra/damz.geojson')
+            .then(r => r.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    pointToLayer: (f, latlng) => L.marker(latlng, {
+                        icon: L.divIcon({
+                            html: '<i class="fas fa-water" style="color: #3b82f6; font-size: 22px;"></i>',
+                            iconSize: [30, 30]
+                        })
+                    }),
+                    onEachFeature: (f, layer) => {
+                        layer.bindPopup(`<b>Dam ID:</b> ${f.properties?.ID || 'N/A'}`);
+                        layer.addTo(damsLayer);
+                    }
+                });
+                
+                document.getElementById('totalDams').textContent = data.features.length;
+                
+                // Note: damsLayer is NOT added to map by default
+            });
+    }
+
+    // ========== Buffer Analysis ==========
+    var selectedPoint = null;
+
+    map.on('click', function(e) {
+        selectedPoint = e.latlng;
+        document.getElementById('bufferInfo').style.display = 'block';
+        document.getElementById('bufferDistance').innerHTML = 
+            `<b>Point:</b> ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+    });
+
+    function applyBuffer() {
+        var radius = document.getElementById('bufferSelect').value;
+        if (!radius) { alert('Select radius'); return; }
+        if (!selectedPoint) { alert('Click map first'); return; }
+        
+        bufferLayer.clearLayers();
+        
+        L.circle(selectedPoint, {
+            radius: parseInt(radius),
+            color: '#dc2626',
+            fillColor: '#dc2626',
+            fillOpacity: 0.1,
+            weight: 3,
+            dashArray: '5,5',
+            pane: 'bufferPane'
+        }).addTo(bufferLayer);
+        
+        map.addLayer(bufferLayer);
+        
+        // Count activities
+        var count = 0;
+        activityMarkers.forEach(m => {
+            if (map.distance(selectedPoint, m.getLatLng()) <= radius) count++;
+        });
+        
+        alert(`✅ ${count} activities within ${radius}m`);
+    }
+
+    function clearBuffer() {
+        bufferLayer.clearLayers();
+        document.getElementById('bufferInfo').style.display = 'none';
+        selectedPoint = null;
+    }
+
+    // ========== Hotspot Chart (auto-load from server) ==========
+    var hotspotChart;
+
+    function loadHotspotData() {
+        Papa.parse('https://hamza-nkhumbwa.github.io/galanwra/Week.csv', {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(r) {
+                document.getElementById('hotspotLoading').style.display = 'none';
+                var keys = Object.keys(r.data[0] || {});
+                var fieldKey = keys.find(k => /field/i.test(k)) || keys[0];
+                var freqKey = keys.find(k => /freq/i.test(k)) || keys[1];
+
+                var fields = r.data.map(d => (d[fieldKey] || '').trim()).filter(Boolean);
+                var freqs = r.data.map(d => parseFloat(d[freqKey]) || 0);
+                var maxF = Math.max(...freqs);
+
+                var bgColors = freqs.map(v => {
+                    var ratio = v / (maxF || 1);
+                    var r2 = Math.round(220 * ratio + 59 * (1 - ratio));
+                    var g2 = Math.round(38 * ratio + 130 * (1 - ratio));
+                    var b2 = Math.round(38 * ratio + 246 * (1 - ratio));
+                    return `rgba(${r2},${g2},${b2},0.85)`;
+                });
+
+                if (hotspotChart) hotspotChart.destroy();
+                hotspotChart = new Chart(document.getElementById('hotspotChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: fields,
+                        datasets: [{
+                            label: 'Incident Frequency',
+                            data: freqs,
+                            backgroundColor: bgColors,
+                            borderColor: bgColors.map(c => c.replace('0.85','1')),
+                            borderWidth: 2,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 800, easing: 'easeInOutQuart' },
+                        plugins: {
+                            legend: { labels: { color: '#e2e8f0' } },
+                            tooltip: {
+                                backgroundColor: 'rgba(15,23,42,0.95)',
+                                titleColor: '#f1f5f9',
+                                bodyColor: '#94a3b8'
+                            }
+                        },
+                        scales: {
+                            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.6)' } },
+                            x: { ticks: { color: '#94a3b8', maxRotation: 40 }, grid: { color: 'rgba(51,65,85,0.3)' } }
+                        }
+                    }
+                });
+            },
+            error: function() {
+                document.getElementById('hotspotLoading').textContent = '⚠ Failed to load hotspot data';
+            }
+        });
+    }
+
+    // ========== Chart Expand / Fullscreen ==========
+    var expandedChartInstance = null;
+
+    function expandChart(canvasId, title) {
+        var sourceChart = Chart.getChart(document.getElementById(canvasId));
+        if (!sourceChart) return;
+
+        document.getElementById('chartModalTitle').innerHTML =
+            '<i class="fas fa-chart-bar" style="color:#dc2626;margin-right:8px;"></i>' + title;
+        document.getElementById('chartExpandModal').classList.add('active');
+
+        if (expandedChartInstance) { expandedChartInstance.destroy(); expandedChartInstance = null; }
+
+        var canvas = document.getElementById('expandedChartCanvas');
+        var ctx = canvas.getContext('2d');
+
+        // Deep clone config
+        var cfg = JSON.parse(JSON.stringify({
+            type: sourceChart.config.type,
+            data: sourceChart.data,
+            options: sourceChart.options
+        }));
+
+        // Make fonts larger in expanded view
+        if (cfg.options.scales) {
+            ['x','y','r'].forEach(axis => {
+                if (cfg.options.scales[axis] && cfg.options.scales[axis].ticks) {
+                    cfg.options.scales[axis].ticks.font = { size: 13 };
+                }
+            });
+        }
+        if (cfg.options.plugins && cfg.options.plugins.legend && cfg.options.plugins.legend.labels) {
+            cfg.options.plugins.legend.labels.font = { size: 13 };
+        }
+        cfg.options.animation = false;
+        cfg.options.maintainAspectRatio = false;
+        cfg.options.responsive = true;
+
+        expandedChartInstance = new Chart(ctx, cfg);
+    }
+
+    function closeExpandModal() {
+        document.getElementById('chartExpandModal').classList.remove('active');
+        if (expandedChartInstance) { expandedChartInstance.destroy(); expandedChartInstance = null; }
+    }
+
+    document.getElementById('chartExpandModal').addEventListener('click', function(e) {
+        if (e.target === this) closeExpandModal();
+    });
+
+    // ========== Initialize Everything ==========
+    loadActivityData();
+    loadPieChartData();
+    loadBarChartData();
+    loadVillages();
+    // loadTransitionData();
+    loadDams();
+    loadHotspotData();
+</script>
+
 </body>
 </html>
-
